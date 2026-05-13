@@ -125,8 +125,18 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  moveSpeed: 5
+  maxMoveSpeed: 6
+  groundAcceleration: 35
+  airAcceleration: 12
+  groundDrag: 6
+  airDrag: 1
+  jumpForce: 18
+  extraGravity: 18
+  visualRoot: {fileID: 0}
+  squashAmount: 0.12
+  squashSpeed: 10
   cameraOffset: {x: 0, y: 8, z: -8}
+  cameraEulerAngles: {x: 45, y: 0, z: 0}
 --- !u!114 &5106346358632133400
 MonoBehaviour:
   m_ObjectHideFlags: 0
