@@ -10,6 +10,9 @@ public class SimplePlayerMovement : NetworkBehaviour
     public Vector3 cameraOffset = new Vector3(0, 8, -8);
 
     private Camera mainCamera;
+    private Transform originalCameraParent;
+    private Vector3 originalCameraPosition;
+    private Quaternion originalCameraRotation;
 
     public override void OnStartLocalPlayer()
     {
@@ -17,17 +20,25 @@ public class SimplePlayerMovement : NetworkBehaviour
 
         Debug.Log($"[PLAYER] Local Player Initialized | NetID={netId}");
 
-        mainCamera = Camera.main;
+        mainCamera = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
 
         if (mainCamera != null)
         {
+            originalCameraParent = mainCamera.transform.parent;
+            originalCameraPosition = mainCamera.transform.position;
+            originalCameraRotation = mainCamera.transform.rotation;
+            mainCamera.enabled = true;
             mainCamera.transform.SetParent(transform);
             mainCamera.transform.localPosition = cameraOffset;
             mainCamera.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
         }
+        else
+        {
+            Debug.LogWarning("[PLAYER] No camera found for the local player.");
+        }
     }
 
-    void Update()
+    private void Update()
     {
         if (!isLocalPlayer) return;
 
@@ -54,6 +65,60 @@ public class SimplePlayerMovement : NetworkBehaviour
     {
         base.OnStopClient();
 
+        if (mainCamera != null)
+        {
+            if (mainCamera.transform.parent == transform)
+            {
+                mainCamera.transform.SetParent(originalCameraParent);
+            }
+
+            if (originalCameraParent == null)
+            {
+                mainCamera.transform.position = originalCameraPosition;
+                mainCamera.transform.rotation = originalCameraRotation;
+            }
+        }
+
         Debug.Log($"[PLAYER] Player Removed | NetID={netId}");
+    }
+
+    [ContextMenu("ResetPosition")]
+    public void ResetToSpawn()
+    {
+        if (isServer && GameManager.Instance != null)
+        {
+            GameManager.Instance.TryResetPlayer(this);
+        }
+    }
+
+    [Command]
+    public void CmdResetMyPosition()
+    {
+        if (GameManager.Instance != null && GameManager.Instance.TryResetPlayer(this))
+        {
+            TargetConfirmReset(connectionToClient);
+            RpcConfirmReset();
+        }
+    }
+
+    [Server]
+    public void ApplySpawnReset(Vector3 position, Quaternion rotation)
+    {
+        transform.SetPositionAndRotation(position, rotation);
+    }
+
+    [TargetRpc]
+    private void TargetConfirmReset(NetworkConnection target)
+    {
+        Debug.Log($"[PLAYER] Your position was reset | NetID={netId}");
+    }
+
+    [ClientRpc]
+    private void RpcConfirmReset()
+    {
+        if (!isLocalPlayer)
+        {
+            Debug.Log($"[PLAYER] Position reset | NetID={netId}");
+        }
     }
 }
