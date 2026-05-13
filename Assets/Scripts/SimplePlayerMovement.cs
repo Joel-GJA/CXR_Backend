@@ -15,6 +15,8 @@ public class SimplePlayerMovement : NetworkBehaviour
     {
         base.OnStartLocalPlayer();
 
+        Debug.Log($"[PLAYER] Local Player Initialized | NetID={netId}");
+
         mainCamera = Camera.main;
 
         if (mainCamera != null)
@@ -27,46 +29,31 @@ public class SimplePlayerMovement : NetworkBehaviour
 
     void Update()
     {
-        // Only allow local player to control this object
         if (!isLocalPlayer) return;
 
         Vector3 movement = Vector3.zero;
 
-        // WASD Controls
         if (Input.GetKey(KeyCode.W))
-        {
             movement += Vector3.forward;
-        }
 
         if (Input.GetKey(KeyCode.S))
-        {
             movement += Vector3.back;
-        }
 
         if (Input.GetKey(KeyCode.A))
-        {
             movement += Vector3.left;
-        }
 
         if (Input.GetKey(KeyCode.D))
-        {
             movement += Vector3.right;
-        }
 
-        // Normalize diagonal movement
         movement = movement.normalized;
 
-        // Move player
         transform.position += movement * moveSpeed * Time.deltaTime;
+    }
 
-        //// Only allow local player to control this object
-        //if (!isLocalPlayer) return;
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
 
-        //float horizontal = Input.GetAxis("Horizontal");
-        //float vertical = Input.GetAxis("Vertical");
-
-        //Vector3 movement = new Vector3(horizontal, 0f, vertical);
-
-        //transform.position += movement * moveSpeed * Time.deltaTime;
+        Debug.Log($"[PLAYER] Player Removed | NetID={netId}");
     }
 }
