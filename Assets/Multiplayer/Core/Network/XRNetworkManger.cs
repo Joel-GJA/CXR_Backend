@@ -1,37 +1,100 @@
+using System.Collections.Generic;
 using Mirror;
 using UnityEngine;
 
 public class XRNetworkManager : NetworkManager
 {
+    // Runtime state registry
+    private readonly Dictionary<int, NetworkConnectionToClient> connectedClients
+        = new Dictionary<int, NetworkConnectionToClient>();
+
+    [Header("Runtime State")]
+    [SerializeField] private bool serverActive = false;
+
+    // =========================
+    // SERVER LIFECYCLE
+    // =========================
+
     public override void OnStartServer()
     {
-        Debug.Log("[SERVER] Server Started");
+        serverActive = true;
+
+        Debug.Log("[SERVER] Runtime Started");
+
+        base.OnStartServer();
     }
 
     public override void OnStopServer()
     {
-        Debug.Log("[SERVER] Server Stopped");
+        serverActive = false;
+
+        connectedClients.Clear();
+
+        Debug.Log("[SERVER] Runtime Stopped");
+
+        base.OnStopServer();
     }
+
+    // =========================
+    // CONNECTION LIFECYCLE
+    // =========================
 
     public override void OnServerConnect(NetworkConnectionToClient conn)
     {
-        Debug.Log($"[SERVER] Client Connected: {conn.connectionId}");
+        base.OnServerConnect(conn);
+
+        if (!connectedClients.ContainsKey(conn.connectionId))
+        {
+            connectedClients.Add(conn.connectionId, conn);
+        }
+
+        Debug.Log($"[SERVER] Client Connected | ID: {conn.connectionId}");
+
+        PrintRuntimeState();
     }
 
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
-        Debug.Log($"[SERVER] Client Disconnected: {conn.connectionId}");
+        Debug.Log($"[SERVER] Client Disconnected | ID: {conn.connectionId}");
+
+        if (connectedClients.ContainsKey(conn.connectionId))
+        {
+            connectedClients.Remove(conn.connectionId);
+        }
 
         base.OnServerDisconnect(conn);
+
+        PrintRuntimeState();
     }
+
+    // =========================
+    // CLIENT LIFECYCLE
+    // =========================
 
     public override void OnClientConnect()
     {
-        Debug.Log("[CLIENT] Connected To Server");
+        base.OnClientConnect();
+
+        Debug.Log("[CLIENT] Connected To Runtime");
     }
 
     public override void OnClientDisconnect()
     {
-        Debug.Log("[CLIENT] Disconnected From Server");
+        base.OnClientDisconnect();
+
+        Debug.Log("[CLIENT] Disconnected From Runtime");
+    }
+
+    // =========================
+    // RUNTIME DIAGNOSTICS
+    // =========================
+
+    private void PrintRuntimeState()
+    {
+        Debug.Log(
+            $"[RUNTIME STATE] " +
+            $"ServerActive={serverActive} | " +
+            $"ConnectedClients={connectedClients.Count}"
+        );
     }
 }
