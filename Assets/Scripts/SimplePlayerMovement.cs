@@ -13,6 +13,8 @@ public class SimplePlayerMovement : NetworkBehaviour
     public float jumpForce = 6f;
     public float extraGravity = 18f;
     public float fallResetHeight = -20f;
+    public float spawnDistance = 2f;
+    public float interactRange = 3f;
 
     [Header("Feel")]
     public Transform visualRoot;
@@ -25,6 +27,42 @@ public class SimplePlayerMovement : NetworkBehaviour
 
     private Rigidbody rb;
     private Camera mainCamera;
+    private Transform originalCameraParent;
+    private Vector3 originalCameraPosition;
+    private Quaternion originalCameraRotation;
+    private Rigidbody cachedRigidbody;
+    private Collider cachedCollider;
+    private Vector3 moveInput;
+    private bool jumpRequested;
+    private bool autoResetRequested;
+    private bool wasGrounded;
+    private Vector3 visualBaseScale;
+    private Vector3 visualScaleVelocity;
+    private SpawnableCarryObject heldObject;
+    private readonly System.Collections.Generic.List<SpawnableCarryObject> ownedSpawnedObjects = new();
+
+    [SyncVar(hook = nameof(OnHeldObjectNetIdChanged))]
+    private uint heldObjectNetId;
+
+    private void Awake()
+    {
+        cachedRigidbody = GetComponent<Rigidbody>();
+        cachedCollider = GetComponent<Collider>();
+        if (visualRoot == null)
+        {
+            visualRoot = transform;
+        }
+
+        visualBaseScale = visualRoot.localScale;
+
+        if (cachedRigidbody != null)
+        {
+            cachedRigidbody.useGravity = true;
+            cachedRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+            cachedRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            cachedRigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+        }
+    }
 
     public override void OnStartLocalPlayer()
     {
@@ -62,7 +100,71 @@ public class SimplePlayerMovement : NetworkBehaviour
 
         movement = movement.normalized;
 
-        transform.position += movement * moveSpeed * Time.deltaTime;
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            jumpRequested = true;
+        }
+
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            CmdSpawnCarryObject();
+        }
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            if (heldObject != null)
+            {
+                CmdDropHeldObject();
+            }
+            else
+            {
+                SpawnableCarryObject nearestObject = FindNearestInteractableObject();
+                if (nearestObject != null)
+                {
+                    CmdPickUpObject(nearestObject.netIdentity);
+                }
+            }
+        }
+
+        if (!autoResetRequested && transform.position.y < fallResetHeight)
+        {
+            autoResetRequested = true;
+            CmdResetMyPosition();
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
+        if (mainCamera != null)
+        {
+            UpdateCameraTransform();
+        }
+
+        UpdateVisualSquash();
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
+        if (cachedRigidbody == null)
+        {
+            return;
+        }
+
+        bool grounded = IsGrounded();
+        ApplyHorizontalMovement(grounded);
+        ApplyJump(grounded);
+        ApplyExtraGravity(grounded);
+        wasGrounded = grounded;
     }
 
     public override void OnStopClient()
@@ -80,6 +182,8 @@ public class SimplePlayerMovement : NetworkBehaviour
         {
             visualRoot.localScale = visualBaseScale;
         }
+
+        heldObject = null;
 
         Debug.Log($"[PLAYER] Player Removed | NetID={netId}");
     }
@@ -103,6 +207,77 @@ public class SimplePlayerMovement : NetworkBehaviour
             TargetConfirmReset(connectionToClient);
             RpcConfirmReset();
         }
+    }
+
+    [Command]
+    private void CmdSpawnCarryObject()
+    {
+        GameObject spawnPrefab = Resources.Load<GameObject>("SpawnableCarryObject");
+        if (spawnPrefab == null)
+        {
+            Debug.LogWarning("[PLAYER] Spawnable carry object prefab was not found.");
+            return;
+        }
+
+        CleanupOwnedObjects();
+        if (ownedSpawnedObjects.Count >= 5)
+        {
+            Debug.Log("[PLAYER] Spawn limit reached.");
+            return;
+        }
+
+        Vector3 spawnPosition = transform.position + transform.forward * spawnDistance + Vector3.up;
+        GameObject spawnedObject = Instantiate(spawnPrefab, spawnPosition, Quaternion.identity);
+        SpawnableCarryObject carryObject = spawnedObject.GetComponent<SpawnableCarryObject>();
+        if (carryObject == null)
+        {
+            Destroy(spawnedObject);
+            return;
+        }
+
+        carryObject.Initialize(netId);
+        NetworkServer.Spawn(spawnedObject);
+        ownedSpawnedObjects.Add(carryObject);
+    }
+
+    [Command]
+    private void CmdPickUpObject(NetworkIdentity objectIdentity)
+    {
+        if (objectIdentity == null)
+        {
+            return;
+        }
+
+        SpawnableCarryObject carryObject = objectIdentity.GetComponent<SpawnableCarryObject>();
+        if (carryObject == null)
+        {
+            return;
+        }
+
+        if (carryObject.TryPickUp(this))
+        {
+            heldObjectNetId = carryObject.netId;
+        }
+    }
+
+    [Command]
+    private void CmdDropHeldObject()
+    {
+        if (heldObjectNetId == 0)
+        {
+            return;
+        }
+
+        if (NetworkServer.spawned.TryGetValue(heldObjectNetId, out NetworkIdentity heldIdentity))
+        {
+            SpawnableCarryObject carryObject = heldIdentity.GetComponent<SpawnableCarryObject>();
+            if (carryObject != null)
+            {
+                carryObject.Drop();
+            }
+        }
+
+        heldObjectNetId = 0;
     }
 
     [Server]
@@ -136,6 +311,15 @@ public class SimplePlayerMovement : NetworkBehaviour
     {
         mainCamera.transform.position = transform.position + cameraOffset;
         mainCamera.transform.rotation = Quaternion.Euler(cameraEulerAngles);
+    }
+
+    [Server]
+    public void ServerClearHeldObject(SpawnableCarryObject carryObject)
+    {
+        if (carryObject != null && heldObjectNetId == carryObject.netId)
+        {
+            heldObjectNetId = 0;
+        }
     }
 
     private void ApplySpawnResetState(Vector3 position, Quaternion rotation)
@@ -253,5 +437,54 @@ public class SimplePlayerMovement : NetworkBehaviour
             ref visualScaleVelocity,
             1f / squashSpeed
         );
+    }
+
+    private void OnHeldObjectNetIdChanged(uint _, uint newHeldObjectNetId)
+    {
+        heldObject = ResolveCarryObject(newHeldObjectNetId);
+    }
+
+    private void CleanupOwnedObjects()
+    {
+        ownedSpawnedObjects.RemoveAll(spawnedObject => spawnedObject == null);
+    }
+
+    private SpawnableCarryObject FindNearestInteractableObject()
+    {
+        SpawnableCarryObject[] allCarryObjects = FindObjectsByType<SpawnableCarryObject>(FindObjectsSortMode.None);
+        SpawnableCarryObject nearestObject = null;
+        float nearestDistance = interactRange;
+
+        foreach (SpawnableCarryObject carryObject in allCarryObjects)
+        {
+            if (carryObject == null || carryObject.OwnerNetId != netId || carryObject.IsHeld)
+            {
+                continue;
+            }
+
+            float distance = Vector3.Distance(transform.position, carryObject.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestObject = carryObject;
+            }
+        }
+
+        return nearestObject;
+    }
+
+    private SpawnableCarryObject ResolveCarryObject(uint objectNetId)
+    {
+        if (objectNetId == 0)
+        {
+            return null;
+        }
+
+        if (NetworkClient.spawned.TryGetValue(objectNetId, out NetworkIdentity objectIdentity))
+        {
+            return objectIdentity.GetComponent<SpawnableCarryObject>();
+        }
+
+        return null;
     }
 }
