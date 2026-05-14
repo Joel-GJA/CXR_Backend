@@ -145,10 +145,10 @@ namespace CXR.SDK.Discovery
                 return explicitPort;
             }
 
-            var activeTransport = Transport.activeTransport;
+            var activeTransport = Transport.active;
             if (activeTransport == null)
             {
-                Logger.Warn("No active Mirror transport was found while building a room advertisement.");
+                CXRLogger.Warn("No active Mirror transport was found while building a room advertisement.");
                 return 0;
             }
 
@@ -165,7 +165,7 @@ namespace CXR.SDK.Discovery
                 return Convert.ToInt32(field.GetValue(activeTransport));
             }
 
-            Logger.Warn("Unable to resolve the active transport port. Set an explicit port on DiscoveryBroadcaster.");
+            CXRLogger.Warn("Unable to resolve the active transport port. Set an explicit port on DiscoveryBroadcaster.");
             return 0;
         }
     }
