@@ -4,12 +4,24 @@ using UnityEngine;
 
 public class XRNetworkManager : NetworkManager
 {
+    [Header("Scene Flow")]
+    [Scene] [SerializeField] private string lobbyScene = "Assets/Multiplayer/Scenes/RoomScene.unity";
+    [Scene] [SerializeField] private string gameplayScene = "Assets/Multiplayer/Scenes/GameMapScene.unity";
+
     // Runtime state registry
     private readonly Dictionary<int, NetworkConnectionToClient> connectedClients
         = new Dictionary<int, NetworkConnectionToClient>();
 
     [Header("Runtime State")]
     [SerializeField] private bool serverActive = false;
+
+    public override void Awake()
+    {
+        base.Awake();
+
+        offlineScene = lobbyScene;
+        onlineScene = gameplayScene;
+    }
 
     // =========================
     // SERVER LIFECYCLE
