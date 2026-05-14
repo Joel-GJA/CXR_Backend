@@ -31,7 +31,7 @@ namespace CXR.SDK.Discovery
             }
             catch (Exception exception)
             {
-                Logger.Warn("Unable to start discovery refresh. " + exception.Message);
+                CXRLogger.Warn("Unable to start discovery refresh. " + exception.Message);
             }
         }
 
@@ -43,7 +43,7 @@ namespace CXR.SDK.Discovery
             }
             catch (Exception exception)
             {
-                Logger.Warn("Unable to advertise room. " + exception.Message);
+                CXRLogger.Warn("Unable to advertise room. " + exception.Message);
             }
         }
 
@@ -55,7 +55,7 @@ namespace CXR.SDK.Discovery
             }
             catch (Exception exception)
             {
-                Logger.Warn("Unable to stop discovery listener. " + exception.Message);
+                CXRLogger.Warn("Unable to stop discovery listener. " + exception.Message);
             }
         }
 
