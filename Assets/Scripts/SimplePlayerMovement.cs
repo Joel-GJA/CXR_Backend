@@ -1,6 +1,7 @@
 using Mirror;
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))]
 public class SimplePlayerMovement : NetworkBehaviour
 {
     [Header("Movement")]
@@ -22,38 +23,8 @@ public class SimplePlayerMovement : NetworkBehaviour
     public Vector3 cameraOffset = new Vector3(0, 8, -8);
     public Vector3 cameraEulerAngles = new Vector3(45f, 0f, 0f);
 
+    private Rigidbody rb;
     private Camera mainCamera;
-    private Transform originalCameraParent;
-    private Vector3 originalCameraPosition;
-    private Quaternion originalCameraRotation;
-    private Rigidbody cachedRigidbody;
-    private Collider cachedCollider;
-    private Vector3 moveInput;
-    private bool jumpRequested;
-    private bool autoResetRequested;
-    private bool wasGrounded;
-    private Vector3 visualBaseScale;
-    private Vector3 visualScaleVelocity;
-
-    private void Awake()
-    {
-        cachedRigidbody = GetComponent<Rigidbody>();
-        cachedCollider = GetComponent<Collider>();
-        if (visualRoot == null)
-        {
-            visualRoot = transform;
-        }
-
-        visualBaseScale = visualRoot.localScale;
-
-        if (cachedRigidbody != null)
-        {
-            cachedRigidbody.useGravity = true;
-            cachedRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
-            cachedRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-            cachedRigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
-        }
-    }
 
     public override void OnStartLocalPlayer()
     {
@@ -61,24 +32,17 @@ public class SimplePlayerMovement : NetworkBehaviour
 
         Debug.Log($"[PLAYER] Local Player Initialized | NetID={netId}");
 
-        mainCamera = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
+        mainCamera = Camera.main;
 
-        if (mainCamera != null)
+        if (mainCamera == null)
         {
-            originalCameraParent = mainCamera.transform.parent;
-            originalCameraPosition = mainCamera.transform.position;
-            originalCameraRotation = mainCamera.transform.rotation;
-            mainCamera.enabled = true;
-            mainCamera.transform.SetParent(null);
-            UpdateCameraTransform();
-        }
-        else
-        {
-            Debug.LogWarning("[PLAYER] No camera found for the local player.");
+            mainCamera.transform.SetParent(transform);
+            mainCamera.transform.localPosition = cameraOffset;
+            mainCamera.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
         }
     }
 
-    private void Update()
+    void Update()
     {
         if (!isLocalPlayer) return;
 
@@ -96,52 +60,9 @@ public class SimplePlayerMovement : NetworkBehaviour
         if (Input.GetKey(KeyCode.D))
             movement += Vector3.right;
 
-        moveInput = movement.normalized;
+        movement = movement.normalized;
 
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            jumpRequested = true;
-        }
-
-        if (!autoResetRequested && transform.position.y < fallResetHeight)
-        {
-            autoResetRequested = true;
-            CmdResetMyPosition();
-        }
-    }
-
-    private void LateUpdate()
-    {
-        if (!isLocalPlayer)
-        {
-            return;
-        }
-
-        if (mainCamera != null)
-        {
-            UpdateCameraTransform();
-        }
-
-        UpdateVisualSquash();
-    }
-
-    private void FixedUpdate()
-    {
-        if (!isLocalPlayer)
-        {
-            return;
-        }
-
-        if (cachedRigidbody == null)
-        {
-            return;
-        }
-
-        bool grounded = IsGrounded();
-        ApplyHorizontalMovement(grounded);
-        ApplyJump(grounded);
-        ApplyExtraGravity(grounded);
-        wasGrounded = grounded;
+        transform.position += movement * moveSpeed * Time.deltaTime;
     }
 
     public override void OnStopClient()
