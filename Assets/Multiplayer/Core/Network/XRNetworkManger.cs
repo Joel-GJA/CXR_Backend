@@ -21,6 +21,12 @@ public class XRNetworkManager : NetworkManager
 
         offlineScene = lobbyScene;
         onlineScene = gameplayScene;
+
+        GameObject spawnableCarryObjectPrefab = Resources.Load<GameObject>("SpawnableCarryObject");
+        if (spawnableCarryObjectPrefab != null && !spawnPrefabs.Contains(spawnableCarryObjectPrefab))
+        {
+            spawnPrefabs.Add(spawnableCarryObjectPrefab);
+        }
     }
 
     // =========================
