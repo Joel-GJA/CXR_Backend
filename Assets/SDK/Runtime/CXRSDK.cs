@@ -60,7 +60,7 @@ namespace CXR.SDK
 
             if (manager != null && manager != discoveryManager)
             {
-                Utils.Logger.Warn("Replacing an existing DiscoveryManager registration.");
+                Utils.CXRLogger.Warn("Replacing an existing DiscoveryManager registration.");
             }
 
             manager = discoveryManager;

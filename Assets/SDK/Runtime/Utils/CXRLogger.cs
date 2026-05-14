@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace CXR.SDK.Utils
 {
-    public static class Logger
+    public static class CXRLogger
     {
         private const string Prefix = "[CXR SDK] ";
 

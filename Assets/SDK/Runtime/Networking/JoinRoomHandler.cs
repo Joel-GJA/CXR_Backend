@@ -48,12 +48,12 @@ namespace CXR.SDK.Networking
 
             networkManager.networkAddress = room.IpAddress;
 
-            if (!TryAssignTransportPort(Transport.activeTransport, room.Port))
+            if (!TryAssignTransportPort(Transport.active, room.Port))
             {
-                Logger.Warn("Unable to set the active transport port automatically. Ensure your transport is configured for port " + room.Port + ".");
+                CXRLogger.Warn("Unable to set the active transport port automatically. Ensure your transport is configured for port " + room.Port + ".");
             }
 
-            Logger.Info("Connecting to " + room.IpAddress + ":" + room.Port + ".");
+            CXRLogger.Info("Connecting to " + room.IpAddress + ":" + room.Port + ".");
             networkManager.StartClient();
             return true;
         }

@@ -83,7 +83,7 @@ namespace CXR.SDK.Discovery
 
             EnsureDependencies();
 
-            Logger.VerboseLogging = verboseLogging;
+            CXRLogger.VerboseLogging = verboseLogging;
             discoveryListener.RoomDiscovered += HandleRoomDiscovered;
             roomRegistry.RegistryChanged += HandleRegistryChanged;
 
@@ -121,7 +121,7 @@ namespace CXR.SDK.Discovery
             EnsureDependencies();
             discoveryListener.RequestRoomRefresh();
             nextRefreshTime = Time.unscaledTime + Mathf.Max(0.25f, refreshIntervalSeconds);
-            Logger.Info("Requested LAN room refresh.");
+            CXRLogger.Info("Requested LAN room refresh.");
         }
 
         public IReadOnlyList<RoomInfo> GetRooms()
@@ -154,7 +154,7 @@ namespace CXR.SDK.Discovery
                 return false;
             }
 
-            Logger.Info("Join workflow initiated for room " + room.RoomName + ".");
+            CXRLogger.Info("Join workflow initiated for room " + room.RoomName + ".");
             return true;
         }
 
@@ -206,7 +206,7 @@ namespace CXR.SDK.Discovery
 
             if (removedCount > 0)
             {
-                Logger.Info("Removed " + removedCount + " stale room entries.");
+                CXRLogger.Info("Removed " + removedCount + " stale room entries.");
             }
         }
 
