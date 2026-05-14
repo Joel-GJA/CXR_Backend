@@ -1,0 +1,28 @@
+{
+  "name": "com.cxr.lan-discovery-sdk",
+  "version": "1.0.0",
+  "displayName": "CXR LAN Discovery SDK",
+  "description": "Lightweight Unity SDK for LAN-based multiplayer room discovery, visibility, metadata, and join workflows on top of Mirror.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.ugui": "1.0.0"
+  },
+  "keywords": [
+    "xr",
+    "lan",
+    "mirror",
+    "discovery",
+    "multiplayer",
+    "room-browser"
+  ],
+  "author": {
+    "name": "CXR Infrastructure"
+  },
+  "samples": [
+    {
+      "displayName": "Room Browser Example",
+      "description": "Simple sample scripts for browsing LAN rooms and joining a Mirror session.",
+      "path": "Samples~/RoomBrowserExample"
+    }
+  ]
+}
