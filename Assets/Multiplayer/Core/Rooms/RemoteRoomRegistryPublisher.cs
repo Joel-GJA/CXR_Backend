@@ -61,14 +61,19 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
     public bool HasRegistry =>
         !string.IsNullOrWhiteSpace(registryUrl);
 
+    public void Initialize(DiscoveryBroadcaster broadcaster)
+    {
+        discoveryBroadcaster = broadcaster;
+    }
+
     private void Awake()
     {
-        ResolveReferences();
+        ResolveSessionManager();
     }
 
     private void OnEnable()
     {
-        ResolveReferences();
+        ResolveSessionManager();
         SubscribeSessionEvents();
         MarkPublishRequested();
         publishLoop = StartCoroutine(PublishLoop());
@@ -135,7 +140,7 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
             yield break;
         }
 
-        ResolveReferences();
+        ResolveSessionManager();
 
         if (discoveryBroadcaster == null ||
             !discoveryBroadcaster.TryBuildResponse(out var response))
@@ -207,13 +212,8 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
             Time.unscaledTime + Mathf.Max(5f, safetyHeartbeatSeconds);
     }
 
-    private void ResolveReferences()
+    private void ResolveSessionManager()
     {
-        if (discoveryBroadcaster == null)
-        {
-            discoveryBroadcaster = GetComponent<DiscoveryBroadcaster>();
-        }
-
         if (sessionManager == null)
         {
             sessionManager = GetComponent<RuntimeSessionManager>();

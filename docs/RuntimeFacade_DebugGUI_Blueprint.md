@@ -20,7 +20,9 @@ Debug GUI prefab:
 
 The debug GUI should not directly poke random Mirror or discovery internals. Production apps need stable hooks that can be used by branded UI, XR controls, automated validation tools, or editor diagnostics.
 
-`XRMultiplayerRuntimeFacade` provides those hooks.
+`XRMultiplayerRuntimeFacade` provides those hooks. All Mirror connection state reads (`NetworkServer.active`, `NetworkClient.isConnected`, `NetworkClient.localPlayer`) are isolated in `XRConnectionStateProvider`; the facade itself never imports Mirror.
+
+The facade no longer resolves its own dependencies at runtime (`FindObjectOfType`/`GetComponent` were removed alongside the per-frame `Update()` loop). Instead, it requires `XRNetworkManager`, `XRRoomDiscoveryLifecycle`, and `RemoteRoomRegistryBrowser` references assigned in the Inspector — or injected via `Initialize(XRConnectionStateProvider)` for tests. Without assigned references, lifecycle commands silently no-op, but state properties (connection, session) remain functional via the internally created `XRConnectionStateProvider`.
 
 ## Facade Read Model
 

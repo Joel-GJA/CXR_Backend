@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using CXR.SDK.Rooms;
-using Mirror;
 using UnityEngine;
 
 [AddComponentMenu("CXR Multiplayer/Runtime Facade")]
@@ -18,10 +17,9 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     private RemoteRoomRegistryBrowser remoteRoomRegistryBrowser;
 
     [SerializeField]
-    private bool autoResolveReferences = true;
-
-    [SerializeField]
     private string defaultClientAddress = "localhost";
+
+    private XRConnectionStateProvider connectionStateProvider;
 
     private readonly XRRoomBrowserModel roomBrowser =
         new XRRoomBrowserModel();
@@ -34,14 +32,15 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
             ? remoteRoomRegistryBrowser.VisibleRooms
             : roomBrowser.VisibleRooms;
 
-    public XRConnectionLifecycle ConnectionState => ResolveConnectionState();
+    public XRConnectionLifecycle ConnectionState =>
+        connectionStateProvider.ConnectionState;
 
-    public bool IsServerActive => NetworkServer.active;
+    public bool IsServerActive => connectionStateProvider.IsServerActive;
 
-    public bool IsClientConnected => NetworkClient.isConnected;
+    public bool IsClientConnected => connectionStateProvider.IsClientConnected;
 
     public bool IsClientConnecting =>
-        NetworkClient.active && !NetworkClient.isConnected;
+        connectionStateProvider.IsClientConnecting;
 
     public bool IsDiscoveryAvailable => discoveryLifecycle != null;
 
@@ -56,8 +55,6 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
             : string.Empty;
         set
         {
-            ResolveReferences();
-
             if (remoteRoomRegistryBrowser != null)
             {
                 remoteRoomRegistryBrowser.RegistryUrl = value;
@@ -102,41 +99,33 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
         SessionManager != null ? SessionManager.ParticipantInfos.Count : 0;
 
     public int ConnectedClientCount =>
-        networkManager != null ? networkManager.GetConnectedClientCount() : 0;
+        connectionStateProvider.ConnectedClientCount;
 
     public uint LocalPlayerNetId =>
-        NetworkClient.localPlayer != null
-            ? NetworkClient.localPlayer.netId
-            : 0;
+        connectionStateProvider.LocalPlayerNetId;
 
     public int LocalConnectionId =>
-        NetworkClient.localPlayer != null &&
-        NetworkClient.localPlayer.connectionToClient != null
-            ? NetworkClient.localPlayer.connectionToClient.connectionId
-            : -1;
+        connectionStateProvider.LocalConnectionId;
 
     public string NetworkAddress =>
-        ActiveNetworkManager != null
-            ? ActiveNetworkManager.networkAddress
-            : string.Empty;
+        connectionStateProvider.NetworkAddress;
 
     private RuntimeSessionManager SessionManager =>
         networkManager != null ? networkManager.SessionManager : null;
 
-    private NetworkManager ActiveNetworkManager =>
-        networkManager != null
-            ? networkManager
-            : NetworkManager.singleton;
+    public void Initialize(XRConnectionStateProvider provider)
+    {
+        connectionStateProvider = provider;
+    }
 
     private void Awake()
     {
-        ResolveReferences();
+        connectionStateProvider = new XRConnectionStateProvider();
         SyncRoomBrowser();
     }
 
     private void OnEnable()
     {
-        ResolveReferences();
         SubscribeDiscovery();
         SubscribeRemoteRegistry();
         SyncRoomBrowser();
@@ -148,44 +137,29 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
         UnsubscribeRemoteRegistry();
     }
 
-    private void Update()
-    {
-        if (autoResolveReferences)
-        {
-            ResolveReferences();
-        }
-
-        SyncRoomBrowser();
-    }
-
     public void StartHost()
     {
-        NetworkManager manager = ActiveNetworkManager;
-        if (manager == null)
+        if (networkManager == null)
         {
             return;
         }
 
-        EnsureActiveTransport(manager);
-        manager.StartHost();
+        networkManager.StartHost();
     }
 
     public void StartServer()
     {
-        NetworkManager manager = ActiveNetworkManager;
-        if (manager == null)
+        if (networkManager == null)
         {
             return;
         }
 
-        EnsureActiveTransport(manager);
-        manager.StartServer();
+        networkManager.StartServer();
     }
 
     public void StartClient(string address)
     {
-        NetworkManager manager = ActiveNetworkManager;
-        if (manager == null)
+        if (networkManager == null)
         {
             return;
         }
@@ -196,17 +170,14 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(resolvedAddress))
         {
-            manager.networkAddress = resolvedAddress;
+            networkManager.networkAddress = resolvedAddress;
         }
 
-        EnsureActiveTransport(manager);
-        manager.StartClient();
+        networkManager.StartClient();
     }
 
     public void RefreshRooms()
     {
-        ResolveReferences();
-
         if (discoveryLifecycle != null)
         {
             discoveryLifecycle.RefreshRooms();
@@ -222,8 +193,6 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void RefreshRemoteRooms()
     {
-        ResolveReferences();
-
         if (remoteRoomRegistryBrowser != null)
         {
             remoteRoomRegistryBrowser.RefreshRooms();
@@ -232,8 +201,6 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void StartDiscovery()
     {
-        ResolveReferences();
-
         if (discoveryLifecycle != null)
         {
             discoveryLifecycle.StartDiscovery();
@@ -253,15 +220,11 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     public bool JoinRoom(string roomId, out string error)
     {
         error = string.Empty;
-        ResolveReferences();
 
-        if (discoveryLifecycle == null)
+        if (discoveryLifecycle == null && remoteRoomRegistryBrowser == null)
         {
-            if (remoteRoomRegistryBrowser == null)
-            {
-                error = "Discovery lifecycle and remote registry are unavailable.";
-                return false;
-            }
+            error = "Discovery lifecycle and remote registry are unavailable.";
+            return false;
         }
 
         if (remoteRoomRegistryBrowser != null &&
@@ -281,38 +244,36 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void Stop()
     {
-        NetworkManager manager = ActiveNetworkManager;
-        if (manager == null)
+        if (networkManager == null)
         {
             return;
         }
 
-        if (NetworkServer.active && NetworkClient.isConnected)
+        if (connectionStateProvider.IsServerActive &&
+            connectionStateProvider.IsClientConnected)
         {
-            manager.StopHost();
+            networkManager.StopHost();
             return;
         }
 
-        if (NetworkClient.active)
+        if (connectionStateProvider.IsClientConnected)
         {
-            manager.StopClient();
+            networkManager.StopClient();
         }
 
-        if (NetworkServer.active)
+        if (connectionStateProvider.IsServerActive)
         {
-            manager.StopServer();
+            networkManager.StopServer();
         }
     }
 
     public void StopClient()
     {
-        ActiveNetworkManager?.StopClient();
+        networkManager?.StopClient();
     }
 
     public RoomInfo GetRoomById(string roomId)
     {
-        ResolveReferences();
-
         RoomInfo remoteRoom = remoteRoomRegistryBrowser != null
             ? remoteRoomRegistryBrowser.GetRoomById(roomId)
             : null;
@@ -325,71 +286,6 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
         return discoveryLifecycle != null
             ? discoveryLifecycle.GetRoomById(roomId)
             : null;
-    }
-
-    public void ResolveReferences()
-    {
-        if (!autoResolveReferences)
-        {
-            return;
-        }
-
-        if (networkManager == null)
-        {
-            networkManager =
-                NetworkManager.singleton as XRNetworkManager ??
-                FindObjectOfType<XRNetworkManager>();
-        }
-
-        XRRoomDiscoveryLifecycle previousLifecycle = discoveryLifecycle;
-        RemoteRoomRegistryBrowser previousRemoteRegistry =
-            remoteRoomRegistryBrowser;
-
-        if (discoveryLifecycle == null)
-        {
-            discoveryLifecycle = GetComponent<XRRoomDiscoveryLifecycle>();
-        }
-
-        if (discoveryLifecycle == null)
-        {
-            discoveryLifecycle = FindObjectOfType<XRRoomDiscoveryLifecycle>();
-        }
-
-        if (remoteRoomRegistryBrowser == null)
-        {
-            remoteRoomRegistryBrowser =
-                GetComponent<RemoteRoomRegistryBrowser>();
-        }
-
-        if (remoteRoomRegistryBrowser == null)
-        {
-            remoteRoomRegistryBrowser =
-                FindObjectOfType<RemoteRoomRegistryBrowser>();
-        }
-
-        if (previousLifecycle != discoveryLifecycle)
-        {
-            if (previousLifecycle != null)
-            {
-                previousLifecycle.RoomsChanged -= HandleRoomsChanged;
-                previousLifecycle.StateChanged -= HandleDiscoveryStateChanged;
-            }
-
-            SubscribeDiscovery();
-        }
-
-        if (previousRemoteRegistry != remoteRoomRegistryBrowser)
-        {
-            if (previousRemoteRegistry != null)
-            {
-                previousRemoteRegistry.RoomsChanged -=
-                    HandleRemoteRoomsChanged;
-                previousRemoteRegistry.RefreshFailed -=
-                    HandleRemoteRefreshFailed;
-            }
-
-            SubscribeRemoteRegistry();
-        }
     }
 
     private void SubscribeDiscovery()
@@ -464,38 +360,5 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     private void SyncRoomBrowser()
     {
         roomBrowser.SyncFrom(discoveryLifecycle);
-    }
-
-    private static void EnsureActiveTransport(NetworkManager manager)
-    {
-        if (Transport.active == null && manager.transport != null)
-        {
-            Transport.active = manager.transport;
-        }
-    }
-
-    private static XRConnectionLifecycle ResolveConnectionState()
-    {
-        if (NetworkServer.active && NetworkClient.isConnected)
-        {
-            return XRConnectionLifecycle.HostActive;
-        }
-
-        if (NetworkServer.active)
-        {
-            return XRConnectionLifecycle.ServerActive;
-        }
-
-        if (NetworkClient.isConnected)
-        {
-            return XRConnectionLifecycle.ClientConnected;
-        }
-
-        if (NetworkClient.active)
-        {
-            return XRConnectionLifecycle.ClientConnecting;
-        }
-
-        return XRConnectionLifecycle.Offline;
     }
 }

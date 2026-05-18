@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CXR.SDK.Discovery;
+using CXR.SDK.Utils;
 using Mirror;
 using UnityEngine;
 
@@ -8,29 +9,6 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class HeadlessServerLauncher : MonoBehaviour
 {
-    private const string StartFlag = "-cxrHeadlessServer";
-    private const string StartLongFlag = "--cxr-headless-server";
-    private const string RoomNameFlag = "-roomName";
-    private const string RoomNameLongFlag = "--room-name";
-    private const string MaxParticipantsFlag = "-maxParticipants";
-    private const string MaxParticipantsLongFlag = "--max-participants";
-    private const string PortFlag = "-port";
-    private const string PortLongFlag = "--port";
-    private const string MetadataFlag = "-metadata";
-    private const string MetadataLongFlag = "--metadata";
-    private const string RegistryUrlFlag = "-registryUrl";
-    private const string RegistryUrlLongFlag = "--registry-url";
-    private const string PublicAddressFlag = "-publicAddress";
-    private const string PublicAddressLongFlag = "--public-address";
-
-    private const string StartEnv = "CXR_HEADLESS_SERVER";
-    private const string RoomNameEnv = "CXR_ROOM_NAME";
-    private const string MaxParticipantsEnv = "CXR_MAX_PARTICIPANTS";
-    private const string PortEnv = "CXR_PORT";
-    private const string MetadataEnv = "CXR_METADATA";
-    private const string RegistryUrlEnv = "CXR_REGISTRY_URL";
-    private const string PublicAddressEnv = "CXR_PUBLIC_ADDRESS";
-
     [Header("Startup")]
     [SerializeField]
     private NetworkManager networkManager;
@@ -79,15 +57,25 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
 
     public HeadlessServerConfig LastAppliedConfig { get; private set; }
 
+    public void Initialize(
+        DiscoveryBroadcaster broadcaster,
+        RuntimeSessionSdkBridge sdkBridge,
+        RemoteRoomRegistryPublisher registryPublisher)
+    {
+        discoveryBroadcaster = broadcaster;
+        sessionSdkBridge = sdkBridge;
+        remoteRegistryPublisher = registryPublisher;
+    }
+
     private void Awake()
     {
-        ResolveReferences();
+        ResolveNetworkManager();
     }
 
     private void Start()
     {
         HeadlessServerConfig config =
-            ParseCommandLine(Environment.GetCommandLineArgs());
+            CommandLineParser.Parse(Environment.GetCommandLineArgs());
 
         if (!ShouldStart(config))
         {
@@ -117,7 +105,7 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
 
     public void ApplyConfiguration(HeadlessServerConfig config)
     {
-        ResolveReferences();
+        ResolveNetworkManager();
 
         HeadlessServerConfig resolved = config ?? new HeadlessServerConfig();
 
@@ -143,8 +131,8 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
         if (networkManager != null)
         {
             EnsureActiveTransport(networkManager);
-            TryAssignTransportPort(networkManager.transport, port);
-            TryAssignTransportPort(Transport.active, port);
+            TransportPortHelper.TrySetPort(networkManager.transport, port);
+            TransportPortHelper.TrySetPort(Transport.active, port);
         }
 
         if (discoveryBroadcaster != null)
@@ -202,7 +190,7 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
 
     public void StartServer()
     {
-        ResolveReferences();
+        ResolveNetworkManager();
 
         if (networkManager == null || NetworkServer.active)
         {
@@ -240,193 +228,7 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
             $"Time={DateTime.UtcNow:O}");
     }
 
-    public static HeadlessServerConfig ParseCommandLine(string[] args)
-    {
-        HeadlessServerConfig config = new HeadlessServerConfig();
-        ApplyEnvironment(config);
-
-        if (args == null)
-        {
-            return config;
-        }
-
-        for (int index = 0; index < args.Length; index++)
-        {
-            string arg = args[index];
-            if (string.IsNullOrWhiteSpace(arg))
-            {
-                continue;
-            }
-
-            if (EqualsFlag(arg, StartFlag) ||
-                EqualsFlag(arg, StartLongFlag) ||
-                EqualsFlag(arg, "-server") ||
-                EqualsFlag(arg, "--server"))
-            {
-                config.StartServer = true;
-                continue;
-            }
-
-            if (TryReadInlineValue(arg, RoomNameLongFlag, out string inlineRoomName))
-            {
-                config.RoomName = inlineRoomName;
-                continue;
-            }
-
-            if (EqualsFlag(arg, RoomNameFlag) ||
-                EqualsFlag(arg, RoomNameLongFlag))
-            {
-                config.RoomName = ReadValue(args, ref index);
-                continue;
-            }
-
-            if (TryReadInlineValue(
-                    arg,
-                    MaxParticipantsLongFlag,
-                    out string inlineMaxParticipants) &&
-                int.TryParse(inlineMaxParticipants, out int inlineMax))
-            {
-                config.MaxParticipants = Mathf.Max(1, inlineMax);
-                continue;
-            }
-
-            if (EqualsFlag(arg, MaxParticipantsFlag) ||
-                EqualsFlag(arg, MaxParticipantsLongFlag))
-            {
-                if (int.TryParse(ReadValue(args, ref index), out int value))
-                {
-                    config.MaxParticipants = Mathf.Max(1, value);
-                }
-
-                continue;
-            }
-
-            if (TryReadInlineValue(arg, PortLongFlag, out string inlinePort) &&
-                int.TryParse(inlinePort, out int inlinePortValue))
-            {
-                config.Port = Mathf.Max(1, inlinePortValue);
-                continue;
-            }
-
-            if (EqualsFlag(arg, PortFlag) ||
-                EqualsFlag(arg, PortLongFlag))
-            {
-                if (int.TryParse(ReadValue(args, ref index), out int value))
-                {
-                    config.Port = Mathf.Max(1, value);
-                }
-
-                continue;
-            }
-
-            if (TryReadInlineValue(
-                    arg,
-                    MetadataLongFlag,
-                    out string inlineMetadata))
-            {
-                ParseMetadata(inlineMetadata, config);
-                continue;
-            }
-
-            if (EqualsFlag(arg, MetadataFlag) ||
-                EqualsFlag(arg, MetadataLongFlag))
-            {
-                ParseMetadata(ReadValue(args, ref index), config);
-                continue;
-            }
-
-            if (TryReadInlineValue(
-                    arg,
-                    RegistryUrlLongFlag,
-                    out string inlineRegistryUrl))
-            {
-                config.RegistryUrl = inlineRegistryUrl;
-                continue;
-            }
-
-            if (EqualsFlag(arg, RegistryUrlFlag) ||
-                EqualsFlag(arg, RegistryUrlLongFlag))
-            {
-                config.RegistryUrl = ReadValue(args, ref index);
-                continue;
-            }
-
-            if (TryReadInlineValue(
-                    arg,
-                    PublicAddressLongFlag,
-                    out string inlinePublicAddress))
-            {
-                config.PublicAddress = inlinePublicAddress;
-                continue;
-            }
-
-            if (EqualsFlag(arg, PublicAddressFlag) ||
-                EqualsFlag(arg, PublicAddressLongFlag))
-            {
-                config.PublicAddress = ReadValue(args, ref index);
-            }
-        }
-
-        return config;
-    }
-
-    private static void ApplyEnvironment(HeadlessServerConfig config)
-    {
-        if (config == null)
-        {
-            return;
-        }
-
-        string start = Environment.GetEnvironmentVariable(StartEnv);
-        if (IsTruthy(start))
-        {
-            config.StartServer = true;
-        }
-
-        string roomName = Environment.GetEnvironmentVariable(RoomNameEnv);
-        if (!string.IsNullOrWhiteSpace(roomName))
-        {
-            config.RoomName = roomName.Trim();
-        }
-
-        string maxParticipants =
-            Environment.GetEnvironmentVariable(MaxParticipantsEnv);
-        if (int.TryParse(maxParticipants, out int maxParticipantsValue))
-        {
-            config.MaxParticipants = Mathf.Max(1, maxParticipantsValue);
-        }
-
-        string port = Environment.GetEnvironmentVariable(PortEnv);
-        if (int.TryParse(port, out int portValue))
-        {
-            config.Port = Mathf.Max(1, portValue);
-        }
-
-        string metadata = Environment.GetEnvironmentVariable(MetadataEnv);
-        if (!string.IsNullOrWhiteSpace(metadata))
-        {
-            string[] entries = metadata.Split(';');
-            for (int index = 0; index < entries.Length; index++)
-            {
-                ParseMetadata(entries[index], config);
-            }
-        }
-
-        string registryUrl = Environment.GetEnvironmentVariable(RegistryUrlEnv);
-        if (!string.IsNullOrWhiteSpace(registryUrl))
-        {
-            config.RegistryUrl = registryUrl.Trim();
-        }
-
-        string publicAddress =
-            Environment.GetEnvironmentVariable(PublicAddressEnv);
-        if (!string.IsNullOrWhiteSpace(publicAddress))
-        {
-            config.PublicAddress = publicAddress.Trim();
-        }
-    }
-
-    private void ResolveReferences()
+    private void ResolveNetworkManager()
     {
         if (networkManager == null)
         {
@@ -434,88 +236,6 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
                 NetworkManager.singleton ??
                 GetComponent<NetworkManager>();
         }
-
-        if (discoveryBroadcaster == null)
-        {
-            discoveryBroadcaster = GetComponent<DiscoveryBroadcaster>();
-        }
-
-        if (sessionSdkBridge == null)
-        {
-            sessionSdkBridge = GetComponent<RuntimeSessionSdkBridge>();
-        }
-
-        if (remoteRegistryPublisher == null)
-        {
-            remoteRegistryPublisher =
-                GetComponent<RemoteRoomRegistryPublisher>();
-        }
-    }
-
-    private static string ReadValue(string[] args, ref int index)
-    {
-        int nextIndex = index + 1;
-        if (nextIndex >= args.Length)
-        {
-            return string.Empty;
-        }
-
-        index = nextIndex;
-        return args[nextIndex] ?? string.Empty;
-    }
-
-    private static void ParseMetadata(
-        string rawValue,
-        HeadlessServerConfig config)
-    {
-        if (string.IsNullOrWhiteSpace(rawValue) || config == null)
-        {
-            return;
-        }
-
-        int splitIndex = rawValue.IndexOf('=');
-        if (splitIndex <= 0)
-        {
-            return;
-        }
-
-        string key = rawValue.Substring(0, splitIndex);
-        string value = rawValue.Substring(splitIndex + 1);
-        config.SetMetadata(key, value);
-    }
-
-    private static bool TryReadInlineValue(
-        string arg,
-        string flag,
-        out string value)
-    {
-        value = string.Empty;
-
-        string prefix = flag + "=";
-        if (string.IsNullOrWhiteSpace(arg) ||
-            !arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        value = arg.Substring(prefix.Length);
-        return true;
-    }
-
-    private static bool EqualsFlag(string value, string flag)
-    {
-        return string.Equals(
-            value,
-            flag,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsTruthy(string value)
-    {
-        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(value, "on", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void EnsureActiveTransport(NetworkManager manager)
@@ -531,43 +251,5 @@ public sealed class HeadlessServerLauncher : MonoBehaviour
         return NetworkServer.connections != null
             ? NetworkServer.connections.Count
             : 0;
-    }
-
-    private static bool TryAssignTransportPort(Transport transport, int port)
-    {
-        if (transport == null || port <= 0)
-        {
-            return false;
-        }
-
-        Type transportType = transport.GetType();
-        var property =
-            transportType.GetProperty("Port") ??
-            transportType.GetProperty("port") ??
-            transportType.GetProperty("ServerPort") ??
-            transportType.GetProperty("serverPort");
-
-        if (property != null && property.CanWrite)
-        {
-            property.SetValue(
-                transport,
-                Convert.ChangeType(port, property.PropertyType));
-
-            return true;
-        }
-
-        var field =
-            transportType.GetField("Port") ??
-            transportType.GetField("port") ??
-            transportType.GetField("ServerPort") ??
-            transportType.GetField("serverPort");
-
-        if (field == null)
-        {
-            return false;
-        }
-
-        field.SetValue(transport, Convert.ChangeType(port, field.FieldType));
-        return true;
     }
 }
