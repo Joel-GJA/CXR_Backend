@@ -49,6 +49,37 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
         remoteRoomRegistryBrowser != null &&
         remoteRoomRegistryBrowser.HasRegistry;
 
+    public string RemoteRegistryUrl
+    {
+        get => remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.RegistryUrl
+            : string.Empty;
+        set
+        {
+            ResolveReferences();
+
+            if (remoteRoomRegistryBrowser != null)
+            {
+                remoteRoomRegistryBrowser.RegistryUrl = value;
+            }
+        }
+    }
+
+    public int RemoteRoomCount =>
+        remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.VisibleRooms.Count
+            : 0;
+
+    public string RemoteRegistryLastError =>
+        remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.LastError
+            : string.Empty;
+
+    public float RemoteRegistryLastRefreshTime =>
+        remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.LastRefreshTime
+            : -1f;
+
     public RuntimeSessionState SessionState =>
         SessionManager != null
             ? SessionManager.State
@@ -174,6 +205,16 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
         if (remoteRoomRegistryBrowser != null &&
             remoteRoomRegistryBrowser.HasRegistry)
+        {
+            remoteRoomRegistryBrowser.RefreshRooms();
+        }
+    }
+
+    public void RefreshRemoteRooms()
+    {
+        ResolveReferences();
+
+        if (remoteRoomRegistryBrowser != null)
         {
             remoteRoomRegistryBrowser.RefreshRooms();
         }

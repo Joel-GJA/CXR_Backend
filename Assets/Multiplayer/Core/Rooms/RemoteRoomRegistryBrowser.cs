@@ -29,6 +29,8 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
     public string LastError { get; private set; } = string.Empty;
 
+    public float LastRefreshTime { get; private set; } = -1f;
+
     public string RegistryUrl
     {
         get => registryUrl;
@@ -114,12 +116,17 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
         using UnityWebRequest request = UnityWebRequest.Get(BuildRoomsUrl());
         request.timeout = 5;
+        LastRefreshTime = Time.unscaledTime;
 
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            LastError = request.error;
+            LastError =
+                $"Remote registry request failed for {BuildRoomsUrl()}: " +
+                request.error;
+
+            Debug.LogWarning("[REMOTE ROOM REGISTRY] " + LastError);
             RefreshFailed?.Invoke(LastError);
             yield break;
         }
@@ -140,6 +147,12 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
                 }
             }
         }
+
+        Debug.Log(
+            "[REMOTE ROOM REGISTRY] Refreshed " +
+            visibleRooms.Count +
+            " rooms from " +
+            BuildRoomsUrl());
 
         RoomsChanged?.Invoke(visibleRooms);
     }
