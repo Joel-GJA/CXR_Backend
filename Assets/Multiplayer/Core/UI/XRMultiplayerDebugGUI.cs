@@ -330,9 +330,6 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
             runtimeFacade = gameObject.AddComponent<XRMultiplayerRuntimeFacade>();
         }
 
-        if (runtimeFacade != null)
-        {
-            runtimeFacade.ResolveReferences();
-        }
+        // facade handles its own state internally
     }
 }

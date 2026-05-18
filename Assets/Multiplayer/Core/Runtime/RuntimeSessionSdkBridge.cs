@@ -34,7 +34,7 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         get => roomName;
         set
         {
-            EnsureRuntimeComponents();
+            EnsureSessionManager();
 
             roomName = string.IsNullOrWhiteSpace(value)
                 ? "XR Runtime Session"
@@ -50,7 +50,7 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         get => maxParticipants;
         set
         {
-            EnsureRuntimeComponents();
+            EnsureSessionManager();
 
             maxParticipants = Mathf.Max(1, value);
             ApplyStaticAdvertisement();
@@ -58,16 +58,32 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         }
     }
 
+    public void Initialize(
+        DiscoveryBroadcaster broadcaster,
+        DiscoveryListener listener)
+    {
+        discoveryBroadcaster = broadcaster;
+        discoveryListener = listener;
+
+        if (discoveryListener != null && discoveryBroadcaster != null)
+            discoveryListener.SetBroadcaster(discoveryBroadcaster);
+
+        EnsureSessionManager();
+        ApplyStaticAdvertisement();
+        Subscribe();
+        PublishSessionAdvertisement();
+    }
+
     private void Awake()
     {
-        EnsureRuntimeComponents();
+        EnsureSessionManager();
         ApplyStaticAdvertisement();
         PublishSessionAdvertisement();
     }
 
     private void OnEnable()
     {
-        EnsureRuntimeComponents();
+        EnsureSessionManager();
         Subscribe();
         PublishSessionAdvertisement();
     }
@@ -77,14 +93,9 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         Unsubscribe();
     }
 
-    private void Update()
-    {
-        PublishSessionAdvertisement();
-    }
-
     public void InitializeForRuntime()
     {
-        EnsureRuntimeComponents();
+        EnsureSessionManager();
         ApplyStaticAdvertisement();
         Subscribe();
         PublishSessionAdvertisement();
@@ -125,7 +136,7 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
             NetworkServer.active.ToString());
     }
 
-    private void EnsureRuntimeComponents()
+    private void EnsureSessionManager()
     {
         if (sessionManager == null)
         {
@@ -138,33 +149,6 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         {
             sessionManager =
                 gameObject.AddComponent<RuntimeSessionManager>();
-        }
-
-        if (discoveryListener == null)
-        {
-            discoveryListener = GetComponent<DiscoveryListener>();
-        }
-
-        if (discoveryListener == null && autoCreateSdkComponents)
-        {
-            discoveryListener =
-                gameObject.AddComponent<DiscoveryListener>();
-        }
-
-        if (discoveryBroadcaster == null)
-        {
-            discoveryBroadcaster = GetComponent<DiscoveryBroadcaster>();
-        }
-
-        if (discoveryBroadcaster == null && autoCreateSdkComponents)
-        {
-            discoveryBroadcaster =
-                gameObject.AddComponent<DiscoveryBroadcaster>();
-        }
-
-        if (discoveryListener != null && discoveryBroadcaster != null)
-        {
-            discoveryListener.SetBroadcaster(discoveryBroadcaster);
         }
     }
 

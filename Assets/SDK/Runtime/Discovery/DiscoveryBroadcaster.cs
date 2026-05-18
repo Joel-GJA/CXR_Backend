@@ -178,29 +178,16 @@ namespace CXR.SDK.Discovery
         private int ResolvePort()
         {
             if (explicitPort > 0)
-            {
                 return explicitPort;
-            }
 
-            var activeTransport = Transport.active;
-            if (activeTransport == null)
+            if (Transport.active == null)
             {
                 CXRLogger.Warn("No active Mirror transport was found while building a room advertisement.");
                 return 0;
             }
 
-            var transportType = activeTransport.GetType();
-            var property = transportType.GetProperty("Port") ?? transportType.GetProperty("port");
-            if (property != null && property.CanRead)
-            {
-                return Convert.ToInt32(property.GetValue(activeTransport));
-            }
-
-            var field = transportType.GetField("Port") ?? transportType.GetField("port");
-            if (field != null)
-            {
-                return Convert.ToInt32(field.GetValue(activeTransport));
-            }
+            if (TransportPortHelper.TryGetPort(Transport.active, out int port))
+                return port;
 
             CXRLogger.Warn("Unable to resolve the active transport port. Set an explicit port on DiscoveryBroadcaster.");
             return 0;
