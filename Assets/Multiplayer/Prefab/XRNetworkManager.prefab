@@ -327,5 +327,7 @@ MonoBehaviour:
   publicAddress: 
   publicPort: 7777
   publishOnlyWhenServerActive: 1
-  publishIntervalSeconds: 5
+  publishCheckIntervalSeconds: 1
+  safetyHeartbeatSeconds: 30
   discoveryBroadcaster: {fileID: 4144893983872362544}
+  sessionManager: {fileID: 8730175284822302973}

@@ -199,6 +199,11 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         GUILayout.Label(
             "Last Refresh: " +
             FormatTime(runtimeFacade.RemoteRegistryLastRefreshTime));
+        GUILayout.Label(
+            "Last HTTP: " +
+            FormatHttpStatus(
+                runtimeFacade.RemoteRegistryLastResponseCode,
+                runtimeFacade.RemoteRegistryLastResponseBytes));
 
         if (!string.IsNullOrWhiteSpace(
                 runtimeFacade.RemoteRegistryLastError))
@@ -299,6 +304,13 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         }
 
         return time.ToString("0.00") + "s";
+    }
+
+    private string FormatHttpStatus(long responseCode, int bytes)
+    {
+        return responseCode < 0
+            ? "none"
+            : responseCode + " (" + bytes + " bytes)";
     }
 
     private void ResolveReferences()

@@ -22,17 +22,28 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
     private bool publishOnlyWhenServerActive = true;
 
     [SerializeField]
-    private float publishIntervalSeconds = 5f;
+    private float publishCheckIntervalSeconds = 1f;
+
+    [SerializeField]
+    private float safetyHeartbeatSeconds = 30f;
 
     [SerializeField]
     private DiscoveryBroadcaster discoveryBroadcaster;
 
+    [SerializeField]
+    private RuntimeSessionManager sessionManager;
+
     private Coroutine publishLoop;
+    private bool publishRequested = true;
+    private bool lastServerActive;
+    private float nextSafetyHeartbeatTime;
+    private float nextRetryTime;
+    private RuntimeSessionManager subscribedSessionManager;
 
     public string RegistryUrl
     {
         get => registryUrl;
-        set => registryUrl = value ?? string.Empty;
+        set => registryUrl = RemoteRoomRegistryBrowser.NormalizeRegistryUrl(value);
     }
 
     public string PublicAddress
@@ -57,11 +68,16 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
 
     private void OnEnable()
     {
+        ResolveReferences();
+        SubscribeSessionEvents();
+        MarkPublishRequested();
         publishLoop = StartCoroutine(PublishLoop());
     }
 
     private void OnDisable()
     {
+        UnsubscribeSessionEvents();
+
         if (publishLoop != null)
         {
             StopCoroutine(publishLoop);
@@ -76,6 +92,7 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
             return;
         }
 
+        MarkPublishRequested();
         StartCoroutine(PublishOnce());
     }
 
@@ -83,10 +100,25 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
     {
         while (enabled)
         {
-            yield return PublishOnce();
+            bool serverActive = NetworkServer.active;
+            if (serverActive != lastServerActive)
+            {
+                lastServerActive = serverActive;
+                MarkPublishRequested();
+            }
+
+            if (serverActive && Time.unscaledTime >= nextSafetyHeartbeatTime)
+            {
+                MarkPublishRequested();
+            }
+
+            if (publishRequested && Time.unscaledTime >= nextRetryTime)
+            {
+                yield return PublishOnce();
+            }
 
             yield return new WaitForSecondsRealtime(
-                Mathf.Max(1f, publishIntervalSeconds));
+                Mathf.Max(0.25f, publishCheckIntervalSeconds));
         }
     }
 
@@ -94,6 +126,7 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
     {
         if (!HasRegistry)
         {
+            publishRequested = false;
             yield break;
         }
 
@@ -127,8 +160,16 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
         string json = JsonUtility.ToJson(record);
         byte[] body = System.Text.Encoding.UTF8.GetBytes(json);
 
+        string roomsUrl = BuildRoomsUrl();
+        if (string.IsNullOrWhiteSpace(roomsUrl))
+        {
+            Debug.LogWarning(
+                "[REMOTE ROOM REGISTRY] Publish skipped: registry URL is invalid.");
+            yield break;
+        }
+
         using UnityWebRequest request = new UnityWebRequest(
-            BuildRoomsUrl(),
+            roomsUrl,
             UnityWebRequest.kHttpVerbPOST);
 
         request.uploadHandler = new UploadHandlerRaw(body);
@@ -136,14 +177,34 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
         request.SetRequestHeader("Content-Type", "application/json");
         request.timeout = 5;
 
-        yield return request.SendWebRequest();
+        UnityWebRequestAsyncOperation operation;
+        try
+        {
+            operation = request.SendWebRequest();
+        }
+        catch (System.InvalidOperationException exception)
+        {
+            Debug.LogWarning(
+                "[REMOTE ROOM REGISTRY] Publish failed: " +
+                exception.Message);
+            ScheduleRetry();
+            yield break;
+        }
+
+        yield return operation;
 
         if (request.result != UnityWebRequest.Result.Success)
         {
             Debug.LogWarning(
                 "[REMOTE ROOM REGISTRY] Publish failed: " +
                 request.error);
+            ScheduleRetry();
+            yield break;
         }
+
+        publishRequested = false;
+        nextSafetyHeartbeatTime =
+            Time.unscaledTime + Mathf.Max(5f, safetyHeartbeatSeconds);
     }
 
     private void ResolveReferences()
@@ -152,6 +213,76 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
         {
             discoveryBroadcaster = GetComponent<DiscoveryBroadcaster>();
         }
+
+        if (sessionManager == null)
+        {
+            sessionManager = GetComponent<RuntimeSessionManager>();
+        }
+
+        if (sessionManager == null)
+        {
+            sessionManager = FindObjectOfType<RuntimeSessionManager>();
+        }
+
+        SubscribeSessionEvents();
+    }
+
+    private void SubscribeSessionEvents()
+    {
+        if (sessionManager == subscribedSessionManager)
+        {
+            return;
+        }
+
+        UnsubscribeSessionEvents();
+
+        if (sessionManager == null)
+        {
+            return;
+        }
+
+        sessionManager.StateChanged += OnSessionStateChanged;
+        sessionManager.ParticipantRegistered += OnParticipantChanged;
+        sessionManager.ParticipantUnregistered += OnParticipantChanged;
+        subscribedSessionManager = sessionManager;
+    }
+
+    private void UnsubscribeSessionEvents()
+    {
+        if (subscribedSessionManager == null)
+        {
+            return;
+        }
+
+        subscribedSessionManager.StateChanged -= OnSessionStateChanged;
+        subscribedSessionManager.ParticipantRegistered -= OnParticipantChanged;
+        subscribedSessionManager.ParticipantUnregistered -= OnParticipantChanged;
+        subscribedSessionManager = null;
+    }
+
+    private void OnSessionStateChanged(
+        RuntimeSessionState previousState,
+        RuntimeSessionState nextState)
+    {
+        MarkPublishRequested();
+    }
+
+    private void OnParticipantChanged(RuntimeParticipant participant)
+    {
+        MarkPublishRequested();
+    }
+
+    private void MarkPublishRequested()
+    {
+        publishRequested = true;
+        nextRetryTime = 0f;
+    }
+
+    private void ScheduleRetry()
+    {
+        publishRequested = true;
+        nextRetryTime = Time.unscaledTime +
+            Mathf.Max(1f, publishCheckIntervalSeconds);
     }
 
     private string ResolvePublicAddress(string fallback)
@@ -168,6 +299,19 @@ public sealed class RemoteRoomRegistryPublisher : MonoBehaviour
 
     private string BuildRoomsUrl()
     {
-        return registryUrl.TrimEnd('/') + "/rooms";
+        string normalizedUrl =
+            RemoteRoomRegistryBrowser.NormalizeRegistryUrl(registryUrl);
+
+        if (!System.Uri.TryCreate(
+                normalizedUrl,
+                System.UriKind.Absolute,
+                out System.Uri uri) ||
+            (uri.Scheme != System.Uri.UriSchemeHttp &&
+                uri.Scheme != System.Uri.UriSchemeHttps))
+        {
+            return string.Empty;
+        }
+
+        return normalizedUrl.TrimEnd('/') + "/rooms";
     }
 }

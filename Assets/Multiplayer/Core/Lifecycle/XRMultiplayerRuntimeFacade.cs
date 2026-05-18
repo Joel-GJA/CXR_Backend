@@ -75,6 +75,16 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
             ? remoteRoomRegistryBrowser.LastError
             : string.Empty;
 
+    public long RemoteRegistryLastResponseCode =>
+        remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.LastResponseCode
+            : -1;
+
+    public int RemoteRegistryLastResponseBytes =>
+        remoteRoomRegistryBrowser != null
+            ? remoteRoomRegistryBrowser.LastResponseBytes
+            : 0;
+
     public float RemoteRegistryLastRefreshTime =>
         remoteRoomRegistryBrowser != null
             ? remoteRoomRegistryBrowser.LastRefreshTime
