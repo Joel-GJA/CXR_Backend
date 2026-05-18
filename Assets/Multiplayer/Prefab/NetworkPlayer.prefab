@@ -149,16 +149,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   syncMethod: 0
-  syncDirection: 0
+  syncDirection: 1
   syncMode: 0
   syncInterval: 0
   maxMoveSpeed: 6
   groundAcceleration: 35
   airAcceleration: 12
-  groundDrag: 6
+  groundDrag: 0
   airDrag: 1
   jumpForce: 18
   extraGravity: 18
+  fallResetHeight: -20
+  spawnDistance: 2
+  interactRange: 3
   visualRoot: {fileID: 0}
   squashAmount: 0.12
   squashSpeed: 10

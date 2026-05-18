@@ -15,6 +15,8 @@ namespace CXR.SDK.Discovery
         [SerializeField] private string roomName = "LAN Room";
         [SerializeField] private string status = "Open";
         [SerializeField] private int maxPlayers = 16;
+        [SerializeField] private bool useExplicitPlayerCount;
+        [SerializeField] private int explicitPlayerCount;
         [SerializeField] private int explicitPort;
         [SerializeField] private bool requireServerActive = true;
         [SerializeField] private bool autoAdvertise = true;
@@ -37,6 +39,24 @@ namespace CXR.SDK.Discovery
         {
             get => status;
             set => status = string.IsNullOrWhiteSpace(value) ? "Open" : value;
+        }
+
+        public int MaxPlayers
+        {
+            get => maxPlayers;
+            set => maxPlayers = Mathf.Max(1, value);
+        }
+
+        public int ExplicitPort
+        {
+            get => explicitPort;
+            set => explicitPort = Mathf.Max(0, value);
+        }
+
+        public bool RequireServerActive
+        {
+            get => requireServerActive;
+            set => requireServerActive = value;
         }
 
         private void Awake()
@@ -94,6 +114,18 @@ namespace CXR.SDK.Discovery
             return metadataManager.Remove(key);
         }
 
+        public void SetPlayerCountOverride(int playerCount)
+        {
+            explicitPlayerCount = Mathf.Max(0, playerCount);
+            useExplicitPlayerCount = true;
+        }
+
+        public void ClearPlayerCountOverride()
+        {
+            explicitPlayerCount = 0;
+            useExplicitPlayerCount = false;
+        }
+
         public bool TryBuildResponse(out CXRDiscoveryResponse response)
         {
             response = default;
@@ -121,6 +153,11 @@ namespace CXR.SDK.Discovery
 
         private int ResolvePlayerCount()
         {
+            if (useExplicitPlayerCount)
+            {
+                return explicitPlayerCount;
+            }
+
             if (!NetworkServer.active || NetworkServer.connections == null)
             {
                 return 0;
