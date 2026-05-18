@@ -60,6 +60,8 @@ Script:
 
 This component is attached to `XRNetworkManager.prefab`. A headless server process publishes its room to the registry while Mirror server mode is active.
 
+Publishing is event-driven for normal updates: the server posts when the server becomes active, session state changes, or participants join/leave. A slower safety heartbeat keeps stale-room cleanup reliable if no room data changes for a while.
+
 Published data:
 
 - room ID
@@ -150,6 +152,20 @@ export CXR_REGISTRY_URL=http://203.0.113.10:8080
 ```
 
 Then refresh rooms through the debug GUI or through `XRMultiplayerRuntimeFacade.RefreshRooms()`.
+
+## Unity HTTP Setting
+
+The Phase 1 registry uses plain HTTP by default. Unity blocks `http://` requests unless Player Settings allow non-secure HTTP connections.
+
+For current development and validation builds, this project sets:
+
+```text
+Player Settings > Other Settings > Configuration > Allow downloads over HTTP: Always allowed
+```
+
+If the registry works in the Unity Editor but fails in a standalone player with `Insecure connection not allowed`, rebuild the player after confirming this setting for the active build target. The player bakes this setting at build time.
+
+Before production deployment, put the registry behind HTTPS, such as nginx with TLS, and change this setting back to a stricter option.
 
 When a room is selected, the client connects directly to:
 
