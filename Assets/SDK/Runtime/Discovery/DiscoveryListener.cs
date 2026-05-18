@@ -18,6 +18,8 @@ namespace CXR.SDK.Discovery
 
         public int ProtocolVersion => protocolVersion;
 
+        public bool IsAdvertising => serverUdpClient != null;
+
         public void SetBroadcaster(DiscoveryBroadcaster discoveryBroadcaster)
         {
             broadcaster = discoveryBroadcaster;
@@ -39,6 +41,11 @@ namespace CXR.SDK.Discovery
         {
             try
             {
+                if (IsAdvertising)
+                {
+                    return;
+                }
+
                 AdvertiseServer();
             }
             catch (Exception exception)
