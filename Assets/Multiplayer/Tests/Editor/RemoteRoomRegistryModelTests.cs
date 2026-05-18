@@ -4,6 +4,24 @@ using NUnit.Framework;
 public sealed class RemoteRoomRegistryModelTests
 {
     [Test]
+    public void NormalizeRegistryUrl_AddsHttpSchemeWhenMissing()
+    {
+        Assert.AreEqual(
+            "http://172.18.48.104:8080",
+            RemoteRoomRegistryBrowser.NormalizeRegistryUrl(
+                "172.18.48.104:8080"));
+    }
+
+    [Test]
+    public void NormalizeRegistryUrl_PreservesHttpsScheme()
+    {
+        Assert.AreEqual(
+            "https://registry.example.com",
+            RemoteRoomRegistryBrowser.NormalizeRegistryUrl(
+                "https://registry.example.com/"));
+    }
+
+    [Test]
     public void RemoteRoomRecord_RoundTripsRoomInfo()
     {
         RoomInfo room = new RoomInfo

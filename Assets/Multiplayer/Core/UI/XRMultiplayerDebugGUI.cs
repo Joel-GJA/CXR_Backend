@@ -27,6 +27,9 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
     [SerializeField]
     private string directConnectAddress = "localhost";
 
+    [SerializeField]
+    private string remoteRegistryUrl = string.Empty;
+
     private Vector2 scrollPosition;
 
     private void Awake()
@@ -63,6 +66,8 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         DrawNetworkLifecycle();
         GUILayout.Space(8f);
         DrawDiscoveryLifecycle();
+        GUILayout.Space(8f);
+        DrawRemoteRegistry();
         GUILayout.Space(8f);
         DrawSessionSnapshot();
         GUILayout.Space(8f);
@@ -169,6 +174,58 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         GUILayout.Label("Connection ID: " + runtimeFacade.LocalConnectionId);
     }
 
+    private void DrawRemoteRegistry()
+    {
+        GUILayout.Label("Remote Registry");
+
+        if (runtimeFacade == null)
+        {
+            GUILayout.Label("Runtime facade: missing");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(remoteRegistryUrl))
+        {
+            remoteRegistryUrl = runtimeFacade.RemoteRegistryUrl;
+        }
+
+        GUILayout.Label("URL");
+        remoteRegistryUrl = GUILayout.TextField(remoteRegistryUrl);
+
+        GUILayout.Label(
+            "Configured: " +
+            (runtimeFacade.IsRemoteRegistryAvailable ? "yes" : "no"));
+        GUILayout.Label("Remote Rooms: " + runtimeFacade.RemoteRoomCount);
+        GUILayout.Label(
+            "Last Refresh: " +
+            FormatTime(runtimeFacade.RemoteRegistryLastRefreshTime));
+        GUILayout.Label(
+            "Last HTTP: " +
+            FormatHttpStatus(
+                runtimeFacade.RemoteRegistryLastResponseCode,
+                runtimeFacade.RemoteRegistryLastResponseBytes));
+
+        if (!string.IsNullOrWhiteSpace(
+                runtimeFacade.RemoteRegistryLastError))
+        {
+            GUILayout.Label(
+                "Error: " + runtimeFacade.RemoteRegistryLastError);
+        }
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Apply URL"))
+        {
+            runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+        }
+
+        if (GUILayout.Button("Refresh Registry"))
+        {
+            runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+            runtimeFacade.RefreshRemoteRooms();
+        }
+        GUILayout.EndHorizontal();
+    }
+
     private void DrawRoomBrowser()
     {
         GUILayout.Label("Rooms");
@@ -181,7 +238,7 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         IReadOnlyList<RoomInfo> rooms = runtimeFacade.VisibleRooms;
         if (rooms.Count == 0)
         {
-            GUILayout.Label("No LAN rooms visible.");
+            GUILayout.Label("No rooms visible.");
             return;
         }
 
@@ -247,6 +304,13 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         }
 
         return time.ToString("0.00") + "s";
+    }
+
+    private string FormatHttpStatus(long responseCode, int bytes)
+    {
+        return responseCode < 0
+            ? "none"
+            : responseCode + " (" + bytes + " bytes)";
     }
 
     private void ResolveReferences()

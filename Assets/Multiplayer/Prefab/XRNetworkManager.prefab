@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 1767496174479934291}
   - component: {fileID: 1390526089383485935}
   - component: {fileID: 5438721945988238700}
-  - component: {fileID: 2620724912126030033}
   - component: {fileID: 8730175284822302973}
   - component: {fileID: 8700561300101727898}
   - component: {fileID: 8095786558195993472}
@@ -137,20 +136,6 @@ MonoBehaviour:
   debugLog: 0
   statisticsGUI: 0
   statisticsLog: 0
---- !u!114 &2620724912126030033
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5648954666197943591}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6442dc8070ceb41f094e44de0bf87274, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  offsetX: 0
-  offsetY: 0
 --- !u!114 &8730175284822302973
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -224,7 +209,7 @@ MonoBehaviour:
   OnServerFound:
     m_PersistentCalls:
       m_Calls: []
-  secretHandshake: 0
+  secretHandshake: -5870096884108377554
   protocolVersion: 1
   broadcaster: {fileID: 4144893983872362544}
 --- !u!114 &4144893983872362544
@@ -342,5 +327,7 @@ MonoBehaviour:
   publicAddress: 
   publicPort: 7777
   publishOnlyWhenServerActive: 1
-  publishIntervalSeconds: 5
+  publishCheckIntervalSeconds: 1
+  safetyHeartbeatSeconds: 30
   discoveryBroadcaster: {fileID: 4144893983872362544}
+  sessionManager: {fileID: 8730175284822302973}

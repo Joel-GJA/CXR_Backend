@@ -77,7 +77,7 @@ function readJson(request) {
   });
 }
 
-function sendJson(response, statusCode, payload) {
+function sendJson(request, response, statusCode, payload) {
   const body = JSON.stringify(payload);
 
   response.writeHead(statusCode, {
@@ -87,6 +87,10 @@ function sendJson(response, statusCode, payload) {
   });
 
   response.end(body);
+  console.log(
+    `${new Date().toISOString()} ${request.socket.remoteAddress} ` +
+      `${request.method} ${request.url} -> ${statusCode} (${body.length} bytes)`
+  );
 }
 
 const server = http.createServer(async (request, response) => {
@@ -95,12 +99,12 @@ const server = http.createServer(async (request, response) => {
   cleanupStaleRooms();
 
   if (request.method === "GET" && url.pathname === "/health") {
-    sendJson(response, 200, { ok: true, rooms: rooms.size });
+    sendJson(request, response, 200, { ok: true, rooms: rooms.size });
     return;
   }
 
   if (request.method === "GET" && url.pathname === "/rooms") {
-    sendJson(response, 200, { rooms: Array.from(rooms.values()) });
+    sendJson(request, response, 200, { rooms: Array.from(rooms.values()) });
     return;
   }
 
@@ -110,16 +114,16 @@ const server = http.createServer(async (request, response) => {
       const room = normalizeRoom(input);
 
       if (!room.ipAddress || room.port <= 0) {
-        sendJson(response, 400, {
+        sendJson(request, response, 400, {
           error: "room ipAddress and port are required"
         });
         return;
       }
 
       rooms.set(room.roomId, room);
-      sendJson(response, 200, { ok: true, room });
+      sendJson(request, response, 200, { ok: true, room });
     } catch (error) {
-      sendJson(response, 400, { error: error.message });
+      sendJson(request, response, 400, { error: error.message });
     }
 
     return;
@@ -128,11 +132,11 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "DELETE" && url.pathname.startsWith("/rooms/")) {
     const roomId = decodeURIComponent(url.pathname.slice("/rooms/".length));
     rooms.delete(roomId);
-    sendJson(response, 200, { ok: true });
+    sendJson(request, response, 200, { ok: true });
     return;
   }
 
-  sendJson(response, 404, { error: "not found" });
+  sendJson(request, response, 404, { error: "not found" });
 });
 
 server.listen(port, host, () => {

@@ -29,10 +29,16 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
     public string LastError { get; private set; } = string.Empty;
 
+    public long LastResponseCode { get; private set; } = -1;
+
+    public int LastResponseBytes { get; private set; }
+
+    public float LastRefreshTime { get; private set; } = -1f;
+
     public string RegistryUrl
     {
         get => registryUrl;
-        set => registryUrl = value ?? string.Empty;
+        set => registryUrl = NormalizeRegistryUrl(value);
     }
 
     public bool HasRegistry =>
@@ -112,17 +118,63 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
             yield break;
         }
 
-        using UnityWebRequest request = UnityWebRequest.Get(BuildRoomsUrl());
-        request.timeout = 5;
-
-        yield return request.SendWebRequest();
-
-        if (request.result != UnityWebRequest.Result.Success)
+        string roomsUrl = BuildRoomsUrl();
+        if (string.IsNullOrWhiteSpace(roomsUrl))
         {
-            LastError = request.error;
+            LastError = "Remote room registry URL is invalid.";
             RefreshFailed?.Invoke(LastError);
             yield break;
         }
+
+        using UnityWebRequest request = UnityWebRequest.Get(roomsUrl);
+        request.timeout = 5;
+        LastRefreshTime = Time.unscaledTime;
+
+        Debug.Log("[REMOTE ROOM REGISTRY] Refreshing rooms from " + roomsUrl);
+
+        UnityWebRequestAsyncOperation operation;
+        try
+        {
+            operation = request.SendWebRequest();
+        }
+        catch (InvalidOperationException exception)
+        {
+            LastError =
+                $"Remote registry request failed for {roomsUrl}: " +
+                exception.Message;
+
+            Debug.LogWarning("[REMOTE ROOM REGISTRY] " + LastError);
+            RefreshFailed?.Invoke(LastError);
+            yield break;
+        }
+
+        yield return operation;
+
+        LastResponseCode = request.responseCode;
+        LastResponseBytes = request.downloadHandler != null &&
+            request.downloadHandler.data != null
+                ? request.downloadHandler.data.Length
+                : 0;
+
+        if (request.result != UnityWebRequest.Result.Success)
+        {
+            LastError =
+                $"Remote registry request failed for {roomsUrl}: " +
+                request.error +
+                $" (HTTP {LastResponseCode})";
+
+            Debug.LogWarning("[REMOTE ROOM REGISTRY] " + LastError);
+            RefreshFailed?.Invoke(LastError);
+            yield break;
+        }
+
+        Debug.Log(
+            "[REMOTE ROOM REGISTRY] Response HTTP " +
+            LastResponseCode +
+            " with " +
+            LastResponseBytes +
+            " bytes from " +
+            roomsUrl);
 
         RemoteRoomRegistryEnvelope envelope =
             JsonUtility.FromJson<RemoteRoomRegistryEnvelope>(
@@ -139,6 +191,19 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
                     visibleRooms.Add(envelope.rooms[index].ToRoomInfo());
                 }
             }
+        }
+
+        Debug.Log(
+            "[REMOTE ROOM REGISTRY] Refreshed " +
+            visibleRooms.Count +
+            " rooms from " +
+            roomsUrl);
+
+        if (visibleRooms.Count == 0)
+        {
+            Debug.Log(
+                "[REMOTE ROOM REGISTRY] Registry returned no rooms. Body: " +
+                BuildPreview(request.downloadHandler.text));
         }
 
         RoomsChanged?.Invoke(visibleRooms);
@@ -159,7 +224,13 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
     private string BuildRoomsUrl()
     {
-        return registryUrl.TrimEnd('/') + "/rooms";
+        string normalizedUrl = NormalizeRegistryUrl(registryUrl);
+        if (!IsSupportedHttpUrl(normalizedUrl))
+        {
+            return string.Empty;
+        }
+
+        return normalizedUrl.TrimEnd('/') + "/rooms";
     }
 
     private void ConfigureRegistryUrl()
@@ -174,8 +245,45 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(configuredUrl))
         {
-            registryUrl = configuredUrl.Trim();
+            RegistryUrl = configuredUrl;
         }
+    }
+
+    public static string NormalizeRegistryUrl(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = value.Trim();
+        if (!trimmed.Contains("://"))
+        {
+            trimmed = "http://" + trimmed;
+        }
+
+        return trimmed.TrimEnd('/');
+    }
+
+    private static bool IsSupportedHttpUrl(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri uri))
+        {
+            return false;
+        }
+
+        return uri.Scheme == Uri.UriSchemeHttp ||
+            uri.Scheme == Uri.UriSchemeHttps;
+    }
+
+    private static string BuildPreview(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "<empty>";
+        }
+
+        return value.Length <= 256 ? value : value.Substring(0, 256);
     }
 
     private static string ReadRegistryUrlFromCommandLine(string[] args)
