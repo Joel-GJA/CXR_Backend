@@ -1,0 +1,346 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5648954666197943591
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1767496174479934291}
+  - component: {fileID: 1390526089383485935}
+  - component: {fileID: 5438721945988238700}
+  - component: {fileID: 2620724912126030033}
+  - component: {fileID: 8730175284822302973}
+  - component: {fileID: 8700561300101727898}
+  - component: {fileID: 8095786558195993472}
+  - component: {fileID: 3985037088270491481}
+  - component: {fileID: 4144893983872362544}
+  - component: {fileID: 704447783714084901}
+  - component: {fileID: 704447783714084902}
+  - component: {fileID: 704447783714084903}
+  - component: {fileID: 704447783714084904}
+  - component: {fileID: 704447783714084905}
+  m_Layer: 0
+  m_Name: XRNetworkManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1767496174479934291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1390526089383485935
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07ecaf0ccef9aee4c8df410ead2c07cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dontDestroyOnLoad: 1
+  runInBackground: 1
+  headlessStartMode: 0
+  editorAutoStart: 0
+  sendRate: 60
+  unreliableBaselineRate: 1
+  unreliableRedundancy: 0
+  transport: {fileID: 5438721945988238700}
+  networkAddress: localhost
+  maxConnections: 100
+  disconnectInactiveConnections: 0
+  disconnectInactiveTimeout: 60
+  exceptionsDisconnect: 1
+  authenticator: {fileID: 0}
+  offlineScene: 
+  onlineScene: 
+  offlineSceneLoadDelay: 0
+  playerPrefab: {fileID: 1115761513634150744, guid: 838260b115f776040a03d1c0989fe78f, type: 3}
+  autoCreatePlayer: 1
+  playerSpawnMethod: 0
+  spawnPrefabs: []
+  snapshotSettings:
+    bufferTimeMultiplier: 2
+    bufferLimit: 32
+    catchupNegativeThreshold: -1
+    catchupPositiveThreshold: 1
+    catchupSpeed: 0.019999999552965164
+    slowdownSpeed: 0.03999999910593033
+    driftEmaDuration: 1
+    dynamicAdjustment: 1
+    dynamicAdjustmentTolerance: 1
+    deliveryTimeEmaDuration: 2
+  evaluationMethod: 0
+  evaluationInterval: 3
+  timeInterpolationGui: 0
+  lobbyScene: Assets/Multiplayer/Scenes/LobbyScene.unity
+  sessionScene: Assets/Multiplayer/Scenes/SessionScene.unity
+  configureSceneFlowOnAwake: 1
+  preferredTransport: {fileID: 5438721945988238700}
+  assignActiveTransportOnAwake: 1
+  sessionManager: {fileID: 8730175284822302973}
+  autoCreateRuntimeComponents: 1
+  enableSdkDiscoveryBridge: 1
+  sessionSdkBridge: {fileID: 8095786558195993472}
+  discoveryListener: {fileID: 3985037088270491481}
+  discoveryBroadcaster: {fileID: 4144893983872362544}
+  autoCreateDiscoveryComponents: 1
+  registerDefaultResourceSpawnPrefab: 1
+  defaultResourceSpawnPrefabPath: SpawnableCarryObject
+  runtimeSpawnPrefabs:
+  - {fileID: 100000, guid: 00ee8c3102ef45bc82a44351a39da40a, type: 3}
+  - {fileID: 516874709761401578, guid: 1b5c9a735ec6d2640a8e16111b305767, type: 3}
+--- !u!114 &5438721945988238700
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b0fecffa3f624585964b0d0eb21b18e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  port: 7777
+  DualMode: 1
+  NoDelay: 1
+  Interval: 10
+  Timeout: 10000
+  RecvBufferSize: 7361536
+  SendBufferSize: 7361536
+  FastResend: 2
+  ReceiveWindowSize: 4096
+  SendWindowSize: 4096
+  MaxRetransmit: 40
+  MaximizeSocketBuffers: 1
+  ReliableMaxMessageSize: 297433
+  UnreliableMaxMessageSize: 1194
+  debugLog: 0
+  statisticsGUI: 0
+  statisticsLog: 0
+--- !u!114 &2620724912126030033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6442dc8070ceb41f094e44de0bf87274, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  offsetX: 0
+  offsetY: 0
+--- !u!114 &8730175284822302973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5210973f29143384391715f37d9adae1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  discoveryBroadcaster: {fileID: 4144893983872362544}
+  publishSessionMetadata: 1
+  despawnOwnedEntitiesOnDisconnect: 1
+--- !u!114 &8700561300101727898
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6df0187700c18f248b8987059aad52ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sessionManager: {fileID: 8730175284822302973}
+  logStateChanges: 1
+  logParticipantChanges: 1
+  refreshIntervalSeconds: 0.5
+  sessionState: 0
+  activeParticipantCount: 0
+  trackedParticipantCount: 0
+--- !u!114 &8095786558195993472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4604710066e44248b6bdfddbc32a822, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sessionManager: {fileID: 8730175284822302973}
+  discoveryListener: {fileID: 3985037088270491481}
+  discoveryBroadcaster: {fileID: 4144893983872362544}
+  roomName: XR Runtime Session
+  maxParticipants: 16
+  autoCreateSdkComponents: 1
+  publishRuntimeMetadata: 1
+--- !u!114 &3985037088270491481
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1fe21c31eeb0dc4f8d4521837ba1aa4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableActiveDiscovery: 1
+  BroadcastAddress: 
+  serverBroadcastListenPort: 47777
+  ActiveDiscoveryInterval: 3
+  transport: {fileID: 5438721945988238700}
+  OnServerFound:
+    m_PersistentCalls:
+      m_Calls: []
+  secretHandshake: 0
+  protocolVersion: 1
+  broadcaster: {fileID: 4144893983872362544}
+--- !u!114 &4144893983872362544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85d35ee1c9e88184696a5ccf0686211b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  listener: {fileID: 3985037088270491481}
+  roomId: 
+  roomName: XR Runtime Session
+  status: Open
+  maxPlayers: 16
+  useExplicitPlayerCount: 0
+  explicitPlayerCount: 0
+  explicitPort: 0
+  requireServerActive: 1
+  autoAdvertise: 1
+  advertiseIntervalSeconds: 1.5
+  defaultMetadata: []
+--- !u!114 &704447783714084901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e5515c6c2941ce4fb452a95926845a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  discoveryListener: {fileID: 3985037088270491481}
+  joinRoomHandler: {fileID: 704447783714084902}
+  initializeOnAwake: 0
+  autoRefresh: 0
+  refreshImmediately: 0
+  refreshIntervalSeconds: 2
+  staleTimeoutSeconds: 5
+  cleanupIntervalSeconds: 1
+  verboseLogging: 0
+--- !u!114 &704447783714084902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e98f13606b9f04a418fbd2d07620ab0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  networkManager: {fileID: 1390526089383485935}
+  blockJoinWhileServerActive: 1
+--- !u!114 &704447783714084903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c08cd158335d464db8b310530633b055, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  networkManager: {fileID: 1390526089383485935}
+  autoStartInBatchMode: 1
+  requireHeadlessFlagOutsideBatchMode: 1
+  defaultRoomName: XR Runtime Session
+  defaultMaxParticipants: 16
+  defaultPort: 7777
+  discoveryBroadcaster: {fileID: 4144893983872362544}
+  sessionSdkBridge: {fileID: 8095786558195993472}
+  remoteRegistryPublisher: {fileID: 704447783714084905}
+  markAsDedicatedServer: 1
+  logServerHeartbeat: 1
+  heartbeatLogIntervalSeconds: 30
+--- !u!114 &704447783714084904
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f758244d6d724f189dd77ab98cd65e49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enforceEventSystem: 1
+  createEventSystemIfMissing: 1
+  enforceAudioListener: 1
+  createAudioListenerIfMissing: 1
+--- !u!114 &704447783714084905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5648954666197943591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e7f8d9262b34f109171c2fa176cf92a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  registryUrl: 
+  publicAddress: 
+  publicPort: 7777
+  publishOnlyWhenServerActive: 1
+  publishIntervalSeconds: 5
+  discoveryBroadcaster: {fileID: 4144893983872362544}
