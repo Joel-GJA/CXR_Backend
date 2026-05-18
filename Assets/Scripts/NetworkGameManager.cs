@@ -6,7 +6,7 @@ public class NetworkGameManager : NetworkBehaviour
     public static NetworkGameManager Instance { get; private set; }
 
     [Header("Lobby Scene")]
-    [Scene] [SerializeField] private string lobbySceneName = "Assets/Multiplayer/Scenes/RoomScene.unity";
+    [Scene] [SerializeField] private string lobbySceneName = "Assets/Multiplayer/Scenes/LobbyScene.unity";
 
     private void Awake()
     {

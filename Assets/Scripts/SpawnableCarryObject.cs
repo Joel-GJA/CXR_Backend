@@ -11,7 +11,7 @@ public class SpawnableCarryObject : NetworkBehaviour
     [SyncVar] private uint heldByNetId;
 
     private Rigidbody cachedRigidbody;
-    private double destroyAt;
+    private double destroyAt = double.PositiveInfinity;
 
     public uint OwnerNetId => ownerNetId;
     public bool IsHeld => heldByNetId != 0;
@@ -19,6 +19,7 @@ public class SpawnableCarryObject : NetworkBehaviour
     private void Awake()
     {
         cachedRigidbody = GetComponent<Rigidbody>();
+        destroyAt = double.PositiveInfinity;
     }
 
     [Server]

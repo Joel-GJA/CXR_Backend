@@ -30,15 +30,21 @@ public class SimplePlayerMovement : NetworkBehaviour
     private Transform originalCameraParent;
     private Vector3 originalCameraPosition;
     private Quaternion originalCameraRotation;
+
     private Rigidbody cachedRigidbody;
     private Collider cachedCollider;
+
     private Vector3 moveInput;
+
     private bool jumpRequested;
     private bool autoResetRequested;
     private bool wasGrounded;
+
     private Vector3 visualBaseScale;
     private Vector3 visualScaleVelocity;
+
     private SpawnableCarryObject heldObject;
+
     private readonly System.Collections.Generic.List<SpawnableCarryObject> ownedSpawnedObjects = new();
 
     [SyncVar(hook = nameof(OnHeldObjectNetIdChanged))]
@@ -48,6 +54,7 @@ public class SimplePlayerMovement : NetworkBehaviour
     {
         cachedRigidbody = GetComponent<Rigidbody>();
         cachedCollider = GetComponent<Collider>();
+
         if (visualRoot == null)
         {
             visualRoot = transform;
@@ -72,33 +79,50 @@ public class SimplePlayerMovement : NetworkBehaviour
 
         mainCamera = Camera.main;
 
-        if (mainCamera == null)
+        // FIXED CAMERA NULL CHECK
+        if (mainCamera != null)
         {
+            originalCameraParent = mainCamera.transform.parent;
+            originalCameraPosition = mainCamera.transform.position;
+            originalCameraRotation = mainCamera.transform.rotation;
+
             mainCamera.transform.SetParent(transform);
             mainCamera.transform.localPosition = cameraOffset;
-            mainCamera.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
+            mainCamera.transform.localRotation = Quaternion.Euler(cameraEulerAngles);
         }
     }
 
-    void Update()
+    private void Update()
     {
-        if (!isLocalPlayer) return;
+        if (!isLocalPlayer)
+        {
+            return;
+        }
 
         Vector3 movement = Vector3.zero;
 
         if (Input.GetKey(KeyCode.W))
+        {
             movement += Vector3.forward;
+        }
 
         if (Input.GetKey(KeyCode.S))
+        {
             movement += Vector3.back;
+        }
 
         if (Input.GetKey(KeyCode.A))
+        {
             movement += Vector3.left;
+        }
 
         if (Input.GetKey(KeyCode.D))
+        {
             movement += Vector3.right;
+        }
 
-        movement = movement.normalized;
+        // FIXED MOVEMENT INPUT
+        moveInput = movement.normalized;
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
@@ -119,6 +143,7 @@ public class SimplePlayerMovement : NetworkBehaviour
             else
             {
                 SpawnableCarryObject nearestObject = FindNearestInteractableObject();
+
                 if (nearestObject != null)
                 {
                     CmdPickUpObject(nearestObject.netIdentity);
@@ -131,21 +156,6 @@ public class SimplePlayerMovement : NetworkBehaviour
             autoResetRequested = true;
             CmdResetMyPosition();
         }
-    }
-
-    private void LateUpdate()
-    {
-        if (!isLocalPlayer)
-        {
-            return;
-        }
-
-        if (mainCamera != null)
-        {
-            UpdateCameraTransform();
-        }
-
-        UpdateVisualSquash();
     }
 
     private void FixedUpdate()
@@ -161,10 +171,27 @@ public class SimplePlayerMovement : NetworkBehaviour
         }
 
         bool grounded = IsGrounded();
+
         ApplyHorizontalMovement(grounded);
         ApplyJump(grounded);
         ApplyExtraGravity(grounded);
+
         wasGrounded = grounded;
+    }
+
+    private void LateUpdate()
+    {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
+        if (mainCamera != null)
+        {
+            UpdateCameraTransform();
+        }
+
+        UpdateVisualSquash();
     }
 
     public override void OnStopClient()
@@ -203,8 +230,10 @@ public class SimplePlayerMovement : NetworkBehaviour
         if (GameManager.Instance != null && GameManager.Instance.TryResetPlayer(this))
         {
             autoResetRequested = false;
+
             TargetApplySpawnReset(connectionToClient, transform.position, transform.rotation);
             TargetConfirmReset(connectionToClient);
+
             RpcConfirmReset();
         }
     }
@@ -213,6 +242,7 @@ public class SimplePlayerMovement : NetworkBehaviour
     private void CmdSpawnCarryObject()
     {
         GameObject spawnPrefab = Resources.Load<GameObject>("SpawnableCarryObject");
+
         if (spawnPrefab == null)
         {
             Debug.LogWarning("[PLAYER] Spawnable carry object prefab was not found.");
@@ -220,15 +250,24 @@ public class SimplePlayerMovement : NetworkBehaviour
         }
 
         CleanupOwnedObjects();
+
         if (ownedSpawnedObjects.Count >= 5)
         {
             Debug.Log("[PLAYER] Spawn limit reached.");
             return;
         }
 
-        Vector3 spawnPosition = transform.position + transform.forward * spawnDistance + Vector3.up;
-        GameObject spawnedObject = Instantiate(spawnPrefab, spawnPosition, Quaternion.identity);
-        SpawnableCarryObject carryObject = spawnedObject.GetComponent<SpawnableCarryObject>();
+        Vector3 spawnPosition =
+            transform.position +
+            transform.forward * spawnDistance +
+            Vector3.up;
+
+        GameObject spawnedObject =
+            Instantiate(spawnPrefab, spawnPosition, Quaternion.identity);
+
+        SpawnableCarryObject carryObject =
+            spawnedObject.GetComponent<SpawnableCarryObject>();
+
         if (carryObject == null)
         {
             Destroy(spawnedObject);
@@ -236,7 +275,9 @@ public class SimplePlayerMovement : NetworkBehaviour
         }
 
         carryObject.Initialize(netId);
+
         NetworkServer.Spawn(spawnedObject);
+
         ownedSpawnedObjects.Add(carryObject);
     }
 
@@ -248,7 +289,9 @@ public class SimplePlayerMovement : NetworkBehaviour
             return;
         }
 
-        SpawnableCarryObject carryObject = objectIdentity.GetComponent<SpawnableCarryObject>();
+        SpawnableCarryObject carryObject =
+            objectIdentity.GetComponent<SpawnableCarryObject>();
+
         if (carryObject == null)
         {
             return;
@@ -268,9 +311,13 @@ public class SimplePlayerMovement : NetworkBehaviour
             return;
         }
 
-        if (NetworkServer.spawned.TryGetValue(heldObjectNetId, out NetworkIdentity heldIdentity))
+        if (NetworkServer.spawned.TryGetValue(
+            heldObjectNetId,
+            out NetworkIdentity heldIdentity))
         {
-            SpawnableCarryObject carryObject = heldIdentity.GetComponent<SpawnableCarryObject>();
+            SpawnableCarryObject carryObject =
+                heldIdentity.GetComponent<SpawnableCarryObject>();
+
             if (carryObject != null)
             {
                 carryObject.Drop();
@@ -293,7 +340,10 @@ public class SimplePlayerMovement : NetworkBehaviour
     }
 
     [TargetRpc]
-    private void TargetApplySpawnReset(NetworkConnection target, Vector3 position, Quaternion rotation)
+    private void TargetApplySpawnReset(
+        NetworkConnection target,
+        Vector3 position,
+        Quaternion rotation)
     {
         ApplySpawnResetState(position, rotation);
     }
@@ -325,6 +375,7 @@ public class SimplePlayerMovement : NetworkBehaviour
     private void ApplySpawnResetState(Vector3 position, Quaternion rotation)
     {
         autoResetRequested = false;
+
         transform.SetPositionAndRotation(position, rotation);
 
         if (cachedRigidbody != null)
@@ -340,10 +391,18 @@ public class SimplePlayerMovement : NetworkBehaviour
         cachedRigidbody.drag = grounded ? groundDrag : airDrag;
 
         Vector3 desiredVelocity = moveInput * maxMoveSpeed;
+
         Vector3 currentVelocity = cachedRigidbody.velocity;
-        Vector3 currentHorizontalVelocity = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
-        Vector3 velocityDelta = desiredVelocity - currentHorizontalVelocity;
-        float acceleration = grounded ? groundAcceleration : airAcceleration;
+
+        Vector3 currentHorizontalVelocity =
+            new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+
+        Vector3 velocityDelta =
+            desiredVelocity - currentHorizontalVelocity;
+
+        float acceleration =
+            grounded ? groundAcceleration : airAcceleration;
+
         Vector3 force = velocityDelta * acceleration;
 
         cachedRigidbody.AddForce(force, ForceMode.Acceleration);
@@ -365,8 +424,12 @@ public class SimplePlayerMovement : NetworkBehaviour
 
         Vector3 velocity = cachedRigidbody.velocity;
         velocity.y = 0f;
+
         cachedRigidbody.velocity = velocity;
-        cachedRigidbody.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+
+        cachedRigidbody.AddForce(
+            Vector3.up * jumpForce,
+            ForceMode.Impulse);
     }
 
     private void ApplyExtraGravity(bool grounded)
@@ -376,23 +439,43 @@ public class SimplePlayerMovement : NetworkBehaviour
             return;
         }
 
-        cachedRigidbody.AddForce(Vector3.down * extraGravity, ForceMode.Acceleration);
+        cachedRigidbody.AddForce(
+            Vector3.down * extraGravity,
+            ForceMode.Acceleration);
     }
 
     private bool IsGrounded()
     {
         if (cachedCollider == null)
         {
-            Vector3 fallbackOrigin = transform.position + Vector3.up * 0.2f;
-            return Physics.Raycast(fallbackOrigin, Vector3.down, 0.6f);
+            Vector3 fallbackOrigin =
+                transform.position + Vector3.up * 0.2f;
+
+            return Physics.Raycast(
+                fallbackOrigin,
+                Vector3.down,
+                0.6f);
         }
 
         Bounds bounds = cachedCollider.bounds;
-        float radius = Mathf.Max(0.05f, Mathf.Min(bounds.extents.x, bounds.extents.z) * 0.9f);
-        Vector3 origin = bounds.center + Vector3.up * 0.05f;
-        float checkDistance = bounds.extents.y + 0.15f;
 
-        return Physics.SphereCast(origin, radius, Vector3.down, out _, checkDistance);
+        float radius =
+            Mathf.Max(
+                0.05f,
+                Mathf.Min(bounds.extents.x, bounds.extents.z) * 0.9f);
+
+        Vector3 origin =
+            bounds.center + Vector3.up * 0.05f;
+
+        float checkDistance =
+            bounds.extents.y + 0.15f;
+
+        return Physics.SphereCast(
+            origin,
+            radius,
+            Vector3.down,
+            out _,
+            checkDistance);
     }
 
     private void UpdateVisualSquash()
@@ -403,7 +486,14 @@ public class SimplePlayerMovement : NetworkBehaviour
         }
 
         Vector3 targetScale = visualBaseScale;
-        float horizontalSpeed = new Vector3(cachedRigidbody != null ? cachedRigidbody.velocity.x : 0f, 0f, cachedRigidbody != null ? cachedRigidbody.velocity.z : 0f).magnitude;
+
+        float horizontalSpeed =
+            new Vector3(
+                cachedRigidbody != null ? cachedRigidbody.velocity.x : 0f,
+                0f,
+                cachedRigidbody != null ? cachedRigidbody.velocity.z : 0f)
+            .magnitude;
+
         bool grounded = IsGrounded();
 
         if (!grounded)
@@ -411,58 +501,68 @@ public class SimplePlayerMovement : NetworkBehaviour
             targetScale = new Vector3(
                 visualBaseScale.x * (1f - squashAmount),
                 visualBaseScale.y * (1f + squashAmount),
-                visualBaseScale.z * (1f - squashAmount)
-            );
+                visualBaseScale.z * (1f - squashAmount));
         }
         else if (!wasGrounded)
         {
             targetScale = new Vector3(
                 visualBaseScale.x * (1f + squashAmount),
                 visualBaseScale.y * (1f - squashAmount),
-                visualBaseScale.z * (1f + squashAmount)
-            );
+                visualBaseScale.z * (1f + squashAmount));
         }
         else if (horizontalSpeed > 0.1f)
         {
             targetScale = new Vector3(
                 visualBaseScale.x * (1f + squashAmount * 0.35f),
                 visualBaseScale.y * (1f - squashAmount * 0.35f),
-                visualBaseScale.z * (1f + squashAmount * 0.35f)
-            );
+                visualBaseScale.z * (1f + squashAmount * 0.35f));
         }
 
         visualRoot.localScale = Vector3.SmoothDamp(
             visualRoot.localScale,
             targetScale,
             ref visualScaleVelocity,
-            1f / squashSpeed
-        );
+            1f / squashSpeed);
     }
 
-    private void OnHeldObjectNetIdChanged(uint _, uint newHeldObjectNetId)
+    private void OnHeldObjectNetIdChanged(
+        uint _,
+        uint newHeldObjectNetId)
     {
         heldObject = ResolveCarryObject(newHeldObjectNetId);
     }
 
     private void CleanupOwnedObjects()
     {
-        ownedSpawnedObjects.RemoveAll(spawnedObject => spawnedObject == null);
+        ownedSpawnedObjects.RemoveAll(
+            spawnedObject => spawnedObject == null);
     }
 
     private SpawnableCarryObject FindNearestInteractableObject()
     {
-        SpawnableCarryObject[] allCarryObjects = FindObjectsByType<SpawnableCarryObject>(FindObjectsSortMode.None);
+        SpawnableCarryObject[] allCarryObjects =
+            FindObjectsByType<SpawnableCarryObject>(
+                FindObjectsSortMode.None);
+
         SpawnableCarryObject nearestObject = null;
+
         float nearestDistance = interactRange;
 
         foreach (SpawnableCarryObject carryObject in allCarryObjects)
         {
-            if (carryObject == null || carryObject.OwnerNetId != netId || carryObject.IsHeld)
+            if (
+                carryObject == null ||
+                carryObject.OwnerNetId != netId ||
+                carryObject.IsHeld)
             {
                 continue;
             }
 
-            float distance = Vector3.Distance(transform.position, carryObject.transform.position);
+            float distance =
+                Vector3.Distance(
+                    transform.position,
+                    carryObject.transform.position);
+
             if (distance < nearestDistance)
             {
                 nearestDistance = distance;
@@ -480,7 +580,9 @@ public class SimplePlayerMovement : NetworkBehaviour
             return null;
         }
 
-        if (NetworkClient.spawned.TryGetValue(objectNetId, out NetworkIdentity objectIdentity))
+        if (NetworkClient.spawned.TryGetValue(
+            objectNetId,
+            out NetworkIdentity objectIdentity))
         {
             return objectIdentity.GetComponent<SpawnableCarryObject>();
         }
