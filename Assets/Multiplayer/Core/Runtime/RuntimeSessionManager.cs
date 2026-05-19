@@ -1,19 +1,11 @@
 using System;
 using System.Collections.Generic;
-using CXR.SDK.Discovery;
 using Mirror;
 using UnityEngine;
 
 [DisallowMultipleComponent]
 public class RuntimeSessionManager : MonoBehaviour
 {
-    [Header("SDK Integration")]
-    [SerializeField]
-    private DiscoveryBroadcaster discoveryBroadcaster;
-
-    [SerializeField]
-    private bool publishSessionMetadata = true;
-
     [Header("Disconnect Cleanup")]
     [SerializeField]
     private bool despawnOwnedEntitiesOnDisconnect = true;
@@ -56,9 +48,6 @@ public class RuntimeSessionManager : MonoBehaviour
         }
 
         Instance = this;
-
-        ResolveSdkBroadcaster();
-        PublishDiagnostics();
     }
 
     private void OnDestroy()
@@ -77,7 +66,6 @@ public class RuntimeSessionManager : MonoBehaviour
         participantNetIdsByConnectionId.Clear();
 
         TransitionTo(RuntimeSessionState.WaitingForParticipants);
-        PublishDiagnostics();
 
         Debug.Log("[SESSION] Server Session Ready");
     }
@@ -95,7 +83,6 @@ public class RuntimeSessionManager : MonoBehaviour
         participants.Clear();
         participantInfos.Clear();
         participantNetIdsByConnectionId.Clear();
-        PublishDiagnostics();
 
         Debug.Log("[SESSION] Server Session Shutdown");
     }
@@ -134,7 +121,6 @@ public class RuntimeSessionManager : MonoBehaviour
         ParticipantRegistered?.Invoke(participant);
 
         TransitionTo(RuntimeSessionState.Active);
-        PublishDiagnostics();
 
         return true;
     }
@@ -162,7 +148,6 @@ public class RuntimeSessionManager : MonoBehaviour
 
         ParticipantUnregistered?.Invoke(participant);
         HandleEmptySession();
-        PublishDiagnostics();
 
         return true;
     }
@@ -397,59 +382,5 @@ public class RuntimeSessionManager : MonoBehaviour
             $"{previousState} -> {State}");
 
         StateChanged?.Invoke(previousState, State);
-        PublishDiagnostics();
-    }
-
-    private void ResolveSdkBroadcaster()
-    {
-        if (discoveryBroadcaster != null)
-        {
-            return;
-        }
-
-        discoveryBroadcaster =
-            GetComponent<DiscoveryBroadcaster>();
-
-        if (discoveryBroadcaster == null)
-        {
-            discoveryBroadcaster =
-                FindObjectOfType<DiscoveryBroadcaster>();
-        }
-    }
-
-    private void PublishDiagnostics()
-    {
-        if (!publishSessionMetadata)
-        {
-            return;
-        }
-
-        ResolveSdkBroadcaster();
-
-        if (discoveryBroadcaster == null)
-        {
-            return;
-        }
-
-        discoveryBroadcaster.Status = ResolveSdkStatus();
-        discoveryBroadcaster.SetMetadata("runtimeSessionState", State.ToString());
-        discoveryBroadcaster.SetMetadata(
-            "runtimeParticipantCount",
-            ParticipantCount.ToString());
-        discoveryBroadcaster.SetMetadata(
-            "runtimeTrackedParticipantCount",
-            participantInfos.Count.ToString());
-    }
-
-    private string ResolveSdkStatus()
-    {
-        return State switch
-        {
-            RuntimeSessionState.WaitingForParticipants => "Open",
-            RuntimeSessionState.Initializing => "Initializing",
-            RuntimeSessionState.Active => "Active",
-            RuntimeSessionState.ShuttingDown => "ShuttingDown",
-            _ => "Unknown"
-        };
     }
 }
