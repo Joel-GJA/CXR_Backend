@@ -224,6 +224,12 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
             runtimeFacade.RefreshRemoteRooms();
         }
         GUILayout.EndHorizontal();
+
+        if (GUILayout.Button("Advertise Room"))
+        {
+            runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+            runtimeFacade.PublishRoomToRegistry();
+        }
     }
 
     private void DrawRoomBrowser()

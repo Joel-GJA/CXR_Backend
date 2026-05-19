@@ -43,8 +43,16 @@ Start a basic headless server:
 Recommended validation command:
 
 ```bash
-./CXR_Backend.x86_64 -batchmode -nographics -logFile - --cxr-headless-server --room-name="XR Dedicated Validation" --max-participants=8 --port=7777 --metadata=scenario=phase1 --metadata=environment=lan
+./CXR_Backend.x86_64 -batchmode -nographics -logFile - \
+  --cxr-headless-server \
+  --room-name "XR Dedicated Validation" \
+  --max-participants 8 \
+  --port 7777 \
+  --metadata scenario=phase1 \
+  --metadata environment=lan
 ```
+
+> **Note**: Use space-separated arguments for values with spaces (`--room-name "Room A"`). PowerShell may split `--room-name="Room A"` on the space, causing parsing issues.
 
 `-logFile -` sends Unity logs to terminal stdout. Keep the process attached to the terminal to watch startup logs, connection logs, registry publish warnings, and periodic headless server heartbeat logs until you terminate the server.
 
@@ -72,25 +80,37 @@ export CXR_METADATA="scenario=phase1;environment=lan"
 
 Command-line arguments override environment defaults.
 
+> **Note**: Stale environment variables from previous testing sessions can interfere. If you changed networks, verify or clear `CXR_REGISTRY_URL` with `[Environment]::SetEnvironmentVariable("CXR_REGISTRY_URL", $null, "User")` on Windows or `unset CXR_REGISTRY_URL` on Linux.
+
 ## Windows Command Line
 
 Use a server build with:
 
 ```powershell
-YourBuild.exe -batchmode -nographics -cxrHeadlessServer
+.\CXR_Backend.exe -batchmode -nographics -cxrHeadlessServer
 ```
 
-For visible terminal logs in PowerShell or Command Prompt, add `-logFile -`:
+For visible terminal logs in PowerShell, add `-logFile -`:
 
 ```powershell
-YourBuild.exe -batchmode -nographics -logFile - -cxrHeadlessServer
+.\CXR_Backend.exe -batchmode -nographics -logFile - -cxrHeadlessServer
 ```
 
 Recommended validation command:
 
 ```powershell
-YourBuild.exe -batchmode -nographics -cxrHeadlessServer -roomName "XR Dedicated Validation" -maxParticipants 8 -port 7777 -metadata scenario=phase1 -metadata environment=lan
+.\CXR_Backend.exe -batchmode -nographics -logFile - `
+  --cxr-headless-server `
+  --room-name "XR Dedicated Validation" `
+  --port 7777 `
+  --public-address 192.168.1.100 `
+  --registry-url http://192.168.1.100:8080 `
+  --metadata scenario=phase1 `
+  --metadata environment=lan
 ```
+
+> **PowerShell note**: Use backtick `` ` `` for line continuation and space-separated arguments. Do not use `--registry-url=http://127.0.0.1:8080` inline — the `=`
+> syntax with URLs can cause parsing issues. Use `--registry-url http://127.0.0.1:8080` instead.
 
 ## Supported Arguments
 
@@ -106,8 +126,8 @@ YourBuild.exe -batchmode -nographics -cxrHeadlessServer -roomName "XR Dedicated 
 - `--port <value>` or `--port=<value>`: Linux-style equivalent.
 - `-metadata <key=value>`: additional advertised metadata. Can be repeated.
 - `--metadata <key=value>` or `--metadata=<key=value>`: Linux-style equivalent. Can be repeated.
-- `--registry-url <url>` or `--registry-url=<url>`: HTTP room registry URL for multi-room hosting.
-- `--public-address <ip-or-host>` or `--public-address=<ip-or-host>`: public address clients should use to connect to this room process.
+- `--registry-url <url>` or `--registry-url=<url>`: HTTP room registry URL for multi-room hosting. If the URL contains `127.0.0.1`, `localhost`, or `0.0.0.0`, it is automatically resolved to the detected LAN IP by `RemoteRoomRegistryBrowser.NormalizeRegistryUrl`.
+- `--public-address <ip-or-host>` or `--public-address=<ip-or-host>`: public address clients should use to connect to this room process. If omitted, the room IP is resolved from the publisher's fallback or auto-detected via `TryResolveLanAddress`.
 
 ## Expected Advertisement Metadata
 
@@ -115,7 +135,7 @@ The dedicated server path publishes normal runtime metadata plus:
 
 - `serverMode=Dedicated`
 
-Other metadata comes from `RuntimeSessionSdkBridge`, such as:
+Other metadata comes from `RuntimeSessionSdkBridge`, which writes metadata to `DiscoveryBroadcaster` only on initialization and session state changes (not every frame):
 
 - `runtimeSessionState`
 - `runtimeParticipantCount`
@@ -123,7 +143,7 @@ Other metadata comes from `RuntimeSessionSdkBridge`, such as:
 - `runtimeServerActive`
 - `runtimeLayer`
 
-When `--registry-url` is provided, the room is also published to the remote HTTP registry for client applications outside LAN discovery.
+When `--registry-url` is provided, the room is also published to the remote HTTP registry for client applications outside LAN discovery. The publisher sends a POST immediately on server start, whenever session state changes, and every `safetyHeartbeatSeconds` (default 30s) as a keepalive.
 
 ## Manual Validation
 
@@ -141,13 +161,24 @@ When `--registry-url` is provided, the room is also published to the remote HTTP
 
 ## Troubleshooting
 
-If the room is not visible:
+If the room is not visible via LAN discovery:
 
 - Confirm both builds are on the same LAN.
 - Confirm firewall rules allow UDP discovery and the Mirror transport port.
 - Confirm the server process is running.
 - Confirm the client and server use the same discovery port.
 - Confirm `DiscoveryBroadcaster` has a valid explicit port or active transport.
+
+If the room is not visible via the remote HTTP registry:
+
+- Check the server terminal for `[REMOTE ROOM REGISTRY]` diagnostic logs. Common causes:
+  - **"Publish skipped: no registry URL configured"**: `--registry-url` or `CXR_REGISTRY_URL` was not provided.
+  - **"Publish deferred: server not active yet"**: The Mirror server is still starting. Logged up to `maxPublishRetries` (default 3) times, then abandoned.
+  - **"Publish abandoned after N retries"**: The server never became active. Click "Advertise Room" in the debug GUI to retry.
+  - **"Publish failed"**: HTTP error. Check that the registry server is running and reachable.
+  - **"Publish skipped: DiscoveryBroadcaster.TryBuildResponse returned false"**: The broadcaster could not build a response. Ensure `explicitPort` is set on the `DiscoveryBroadcaster` component or a transport is active.
+- Verify the registry server is running: `curl http://your-server:8080/health`.
+- Check the registry server terminal. It logs every request: `POST /rooms -> 200`.
 
 If the client cannot join:
 
