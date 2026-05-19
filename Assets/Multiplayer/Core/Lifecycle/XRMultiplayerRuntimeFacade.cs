@@ -62,6 +62,15 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
             {
                 remoteRoomRegistryBrowser.RegistryUrl = value;
             }
+
+            RemoteRoomRegistryPublisher publisher =
+                GetComponent<RemoteRoomRegistryPublisher>() ??
+                FindObjectOfType<RemoteRoomRegistryPublisher>();
+
+            if (publisher != null)
+            {
+                publisher.RegistryUrl = value;
+            }
         }
     }
 
@@ -168,6 +177,7 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
         EnsureActiveTransport(manager);
         manager.StartHost();
+        PublishRoomToRegistry();
     }
 
     public void StartServer()
@@ -180,6 +190,26 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
         EnsureActiveTransport(manager);
         manager.StartServer();
+        PublishRoomToRegistry();
+    }
+
+    public void PublishRoomToRegistry()
+    {
+        RemoteRoomRegistryPublisher publisher =
+            GetComponent<RemoteRoomRegistryPublisher>() ??
+            FindObjectOfType<RemoteRoomRegistryPublisher>();
+
+        if (publisher != null)
+        {
+            if (string.IsNullOrWhiteSpace(publisher.RegistryUrl) &&
+                remoteRoomRegistryBrowser != null &&
+                !string.IsNullOrWhiteSpace(remoteRoomRegistryBrowser.RegistryUrl))
+            {
+                publisher.RegistryUrl = remoteRoomRegistryBrowser.RegistryUrl;
+            }
+
+            publisher.PublishNow();
+        }
     }
 
     public void StartClient(string address)

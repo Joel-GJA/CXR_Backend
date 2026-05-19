@@ -77,11 +77,6 @@ public class RuntimeSessionSdkBridge : MonoBehaviour
         Unsubscribe();
     }
 
-    private void Update()
-    {
-        PublishSessionAdvertisement();
-    }
-
     public void InitializeForRuntime()
     {
         EnsureRuntimeComponents();
