@@ -47,13 +47,15 @@ Commands exposed:
 
 ## Room Metadata
 
-`RuntimeSessionSdkBridge` publishes runtime metadata into room advertisements:
+`RuntimeSessionSdkBridge` publishes runtime metadata into room advertisements. It subscribes to `RuntimeSessionManager` events and writes to `DiscoveryBroadcaster` only on initialization and when the session state changes (not every frame):
 
 - `runtimeSessionState`
 - `runtimeParticipantCount`
 - `runtimeTrackedParticipantCount`
 - `runtimeServerActive`
 - `runtimeLayer`
+
+> **Note**: `RuntimeSessionManager` no longer writes directly to `DiscoveryBroadcaster`. The `PublishDiagnostics()` method and its `DiscoveryBroadcaster` serialized field were removed in favor of the dedicated bridge component.
 
 Additional metadata can be written with:
 
@@ -77,6 +79,8 @@ It raises events for:
 - session state changes
 - participant registration
 - participant unregistration
+
+Events are consumed by `RuntimeSessionSdkBridge` (for LAN metadata) and `RemoteRoomRegistryPublisher` (for HTTP registry updates).
 
 ## Host Flow
 
