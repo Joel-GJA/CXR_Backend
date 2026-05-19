@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const http = require("http");
+const os = require("os");
 const { URL } = require("url");
 
 const host = process.env.CXR_REGISTRY_HOST || "0.0.0.0";
@@ -9,6 +10,21 @@ const staleAfterMs = Number.parseInt(
   process.env.CXR_REGISTRY_STALE_MS || "15000",
   10
 );
+
+function getLocalAddresses() {
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+
+  for (const name of Object.keys(interfaces)) {
+    for (const info of interfaces[name]) {
+      if (info.family === "IPv4" && !info.internal) {
+        addresses.push({ name, address: info.address });
+      }
+    }
+  }
+
+  return addresses;
+}
 
 const rooms = new Map();
 
@@ -25,6 +41,12 @@ function cleanupStaleRooms() {
     }
   }
 }
+
+const cleanupInterval = setInterval(
+  cleanupStaleRooms,
+  Math.max(5000, staleAfterMs / 2)
+);
+cleanupInterval.unref();
 
 function normalizeRoom(input) {
   const roomId =
@@ -93,10 +115,27 @@ function sendJson(request, response, statusCode, payload) {
   );
 }
 
-const server = http.createServer(async (request, response) => {
-  const url = new URL(request.url, `http://${request.headers.host}`);
+async function handlePost(request, response) {
+  try {
+    const input = await readJson(request);
+    const room = normalizeRoom(input);
 
-  cleanupStaleRooms();
+    if (!room.ipAddress || room.port <= 0) {
+      sendJson(request, response, 400, {
+        error: "room ipAddress and port are required"
+      });
+      return;
+    }
+
+    rooms.set(room.roomId, room);
+    sendJson(request, response, 200, { ok: true, room });
+  } catch (error) {
+    sendJson(request, response, 400, { error: error.message });
+  }
+}
+
+const server = http.createServer((request, response) => {
+  const url = new URL(request.url, `http://${request.headers.host}`);
 
   if (request.method === "GET" && url.pathname === "/health") {
     sendJson(request, response, 200, { ok: true, rooms: rooms.size });
@@ -109,23 +148,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "POST" && url.pathname === "/rooms") {
-    try {
-      const input = await readJson(request);
-      const room = normalizeRoom(input);
-
-      if (!room.ipAddress || room.port <= 0) {
-        sendJson(request, response, 400, {
-          error: "room ipAddress and port are required"
-        });
-        return;
-      }
-
-      rooms.set(room.roomId, room);
-      sendJson(request, response, 200, { ok: true, room });
-    } catch (error) {
-      sendJson(request, response, 400, { error: error.message });
-    }
-
+    handlePost(request, response);
     return;
   }
 
@@ -140,7 +163,31 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
+  const addresses = getLocalAddresses();
+
   console.log(
     `CXR room registry listening on http://${host}:${port}, staleAfterMs=${staleAfterMs}`
   );
+
+  if (addresses.length === 0) {
+    console.log(
+      "  Access URLs: http://localhost:" + port +
+      " (no external network interfaces detected)"
+    );
+  } else {
+    console.log("  Access URLs:");
+    console.log("    http://localhost:" + port + "  (this machine only)");
+
+    for (const addr of addresses) {
+      console.log(
+        "    http://" + addr.address + ":" + port +
+        "  (" + addr.name + ")"
+      );
+    }
+
+    console.log(
+      "  Note: If other machines cannot connect, check your firewall" +
+      " allows inbound TCP on port " + port + "."
+    );
+  }
 });

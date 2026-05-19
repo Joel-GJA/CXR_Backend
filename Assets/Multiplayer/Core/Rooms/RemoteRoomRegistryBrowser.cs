@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using CXR.SDK.Discovery;
 using CXR.SDK.Networking;
 using CXR.SDK.Rooms;
 using UnityEngine;
@@ -19,7 +20,17 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
     [SerializeField]
     private JoinRoomHandler joinRoomHandler;
 
+    [SerializeField]
+    [Tooltip("How often to auto-refresh the room list from the remote registry (0 = disable auto-refresh).")]
+    private float autoRefreshIntervalSeconds = 0f;
+
+    [SerializeField]
+    private DiscoveryManager discoveryManager;
+
     private readonly List<RoomInfo> visibleRooms = new List<RoomInfo>();
+    private float nextAutoRefreshTime;
+    private bool isRefreshing;
+    private int refreshSequence;
 
     public event Action<IReadOnlyList<RoomInfo>> RoomsChanged;
 
@@ -54,9 +65,42 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
         ResolveReferences();
     }
 
+    private void OnEnable()
+    {
+        nextAutoRefreshTime = 0f;
+        ResolveReferences();
+        SubscribeDiscoveryEvents();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeDiscoveryEvents();
+    }
+
+    private void Update()
+    {
+        if (string.IsNullOrWhiteSpace(registryUrl))
+        {
+            return;
+        }
+
+        if (autoRefreshIntervalSeconds <= 0f)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime < nextAutoRefreshTime)
+        {
+            return;
+        }
+
+        nextAutoRefreshTime = Time.unscaledTime + autoRefreshIntervalSeconds;
+        RefreshRooms();
+    }
+
     public void RefreshRooms()
     {
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled || isRefreshing)
         {
             return;
         }
@@ -109,10 +153,14 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
     private IEnumerator RefreshRoomsRoutine()
     {
+        isRefreshing = true;
+        int sequence = ++refreshSequence;
+
         LastError = string.Empty;
 
         if (!HasRegistry)
         {
+            isRefreshing = false;
             LastError = "Remote room registry URL is not configured.";
             RefreshFailed?.Invoke(LastError);
             yield break;
@@ -121,6 +169,7 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
         string roomsUrl = BuildRoomsUrl();
         if (string.IsNullOrWhiteSpace(roomsUrl))
         {
+            isRefreshing = false;
             LastError = "Remote room registry URL is invalid.";
             RefreshFailed?.Invoke(LastError);
             yield break;
@@ -139,6 +188,7 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
         }
         catch (InvalidOperationException exception)
         {
+            isRefreshing = false;
             LastError =
                 $"Remote registry request failed for {roomsUrl}: " +
                 exception.Message;
@@ -150,6 +200,11 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
         yield return operation;
 
+        if (sequence != refreshSequence)
+        {
+            yield break;
+        }
+
         LastResponseCode = request.responseCode;
         LastResponseBytes = request.downloadHandler != null &&
             request.downloadHandler.data != null
@@ -158,6 +213,7 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
         if (request.result != UnityWebRequest.Result.Success)
         {
+            isRefreshing = false;
             LastError =
                 $"Remote registry request failed for {roomsUrl}: " +
                 request.error +
@@ -193,6 +249,8 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
             }
         }
 
+        isRefreshing = false;
+
         Debug.Log(
             "[REMOTE ROOM REGISTRY] Refreshed " +
             visibleRooms.Count +
@@ -220,6 +278,37 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
         {
             joinRoomHandler = FindObjectOfType<JoinRoomHandler>();
         }
+
+        if (discoveryManager == null)
+        {
+            discoveryManager = GetComponent<DiscoveryManager>();
+        }
+
+        if (discoveryManager == null)
+        {
+            discoveryManager = FindObjectOfType<DiscoveryManager>();
+        }
+    }
+
+    private void SubscribeDiscoveryEvents()
+    {
+        if (discoveryManager != null)
+        {
+            discoveryManager.RoomsChanged += OnDiscoveryRoomsChanged;
+        }
+    }
+
+    private void UnsubscribeDiscoveryEvents()
+    {
+        if (discoveryManager != null)
+        {
+            discoveryManager.RoomsChanged -= OnDiscoveryRoomsChanged;
+        }
+    }
+
+    private void OnDiscoveryRoomsChanged(IReadOnlyList<RoomInfo> rooms)
+    {
+        RefreshRooms();
     }
 
     private string BuildRoomsUrl()
@@ -262,7 +351,44 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
             trimmed = "http://" + trimmed;
         }
 
-        return trimmed.TrimEnd('/');
+        trimmed = trimmed.TrimEnd('/');
+
+        if (TryResolveLanAddress(out string lanAddress))
+        {
+            if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri uri))
+            {
+                string host = uri.Host;
+                if (host == "127.0.0.1" || host == "localhost" || host == "0.0.0.0")
+                {
+                    trimmed = trimmed.Replace(
+                        host,
+                        lanAddress,
+                        StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+
+        return trimmed;
+    }
+
+    public static bool TryResolveLanAddress(out string address)
+    {
+        System.Net.IPHostEntry hostEntry =
+            System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+
+        foreach (System.Net.IPAddress ip in hostEntry.AddressList)
+        {
+            if (ip.AddressFamily ==
+                System.Net.Sockets.AddressFamily.InterNetwork &&
+                !System.Net.IPAddress.IsLoopback(ip))
+            {
+                address = ip.ToString();
+                return true;
+            }
+        }
+
+        address = string.Empty;
+        return false;
     }
 
     private static bool IsSupportedHttpUrl(string value)
