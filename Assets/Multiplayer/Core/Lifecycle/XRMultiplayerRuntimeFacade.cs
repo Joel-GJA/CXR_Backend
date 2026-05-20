@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CXR.SDK.Rooms;
+using Mirror;
 using UnityEngine;
 
 [AddComponentMenu("CXR Multiplayer/Runtime Facade")]
@@ -130,7 +131,22 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     private void Awake()
     {
         connectionStateProvider = new XRConnectionStateProvider();
+        TryResolveNetworkManager();
         SyncRoomBrowser();
+    }
+
+    private void TryResolveNetworkManager()
+    {
+        if (networkManager != null)
+        {
+            return;
+        }
+
+        if (connectionStateProvider.TryGetActiveNetworkManager(
+                out var manager))
+        {
+            networkManager = manager as XRNetworkManager;
+        }
     }
 
     private void OnEnable()
@@ -148,49 +164,36 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void StartHost()
     {
+        TryResolveNetworkManager();
+
         if (networkManager == null)
         {
             return;
         }
 
-        EnsureActiveTransport(manager);
-        manager.StartHost();
+        EnsureActiveTransport(networkManager);
+        networkManager.StartHost();
         PublishRoomToRegistry();
     }
 
     public void StartServer()
     {
+        TryResolveNetworkManager();
+
         if (networkManager == null)
         {
             return;
         }
 
-        EnsureActiveTransport(manager);
-        manager.StartServer();
+        EnsureActiveTransport(networkManager);
+        networkManager.StartServer();
         PublishRoomToRegistry();
-    }
-
-    public void PublishRoomToRegistry()
-    {
-        RemoteRoomRegistryPublisher publisher =
-            GetComponent<RemoteRoomRegistryPublisher>() ??
-            FindObjectOfType<RemoteRoomRegistryPublisher>();
-
-        if (publisher != null)
-        {
-            if (string.IsNullOrWhiteSpace(publisher.RegistryUrl) &&
-                remoteRoomRegistryBrowser != null &&
-                !string.IsNullOrWhiteSpace(remoteRoomRegistryBrowser.RegistryUrl))
-            {
-                publisher.RegistryUrl = remoteRoomRegistryBrowser.RegistryUrl;
-            }
-
-            publisher.PublishNow();
-        }
     }
 
     public void StartClient(string address)
     {
+        TryResolveNetworkManager();
+
         if (networkManager == null)
         {
             return;
@@ -205,6 +208,7 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
             networkManager.networkAddress = resolvedAddress;
         }
 
+        EnsureActiveTransport(networkManager);
         networkManager.StartClient();
     }
 
@@ -276,6 +280,8 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void Stop()
     {
+        TryResolveNetworkManager();
+
         if (networkManager == null)
         {
             return;
@@ -301,6 +307,7 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
 
     public void StopClient()
     {
+        TryResolveNetworkManager();
         networkManager?.StopClient();
     }
 
@@ -392,5 +399,34 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     private void SyncRoomBrowser()
     {
         roomBrowser.SyncFrom(discoveryLifecycle);
+    }
+
+    public void PublishRoomToRegistry()
+    {
+        RemoteRoomRegistryPublisher publisher =
+            GetComponent<RemoteRoomRegistryPublisher>() ??
+            FindObjectOfType<RemoteRoomRegistryPublisher>();
+
+        if (publisher == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(publisher.RegistryUrl) &&
+            remoteRoomRegistryBrowser != null &&
+            !string.IsNullOrWhiteSpace(remoteRoomRegistryBrowser.RegistryUrl))
+        {
+            publisher.RegistryUrl = remoteRoomRegistryBrowser.RegistryUrl;
+        }
+
+        publisher.PublishNow();
+    }
+
+    private static void EnsureActiveTransport(NetworkManager manager)
+    {
+        if (Transport.active == null && manager.transport != null)
+        {
+            Transport.active = manager.transport;
+        }
     }
 }
