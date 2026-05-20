@@ -63,23 +63,30 @@ Set:
 
 ## 6. Use the SDK API
 
+Interact with the SDK through `DiscoveryManager`. Attach it to a GameObject in your scene (it self-configures on Awake):
+
 ```csharp
-using CXR.SDK;
+using CXR.SDK.Discovery;
 
 public sealed class RoomBrowserController : MonoBehaviour
 {
+    [SerializeField] private DiscoveryManager discoveryManager;
+
     private void Start()
     {
-        CXRSDK.Initialize();
-        CXRSDK.RefreshRooms();
+        if (discoveryManager == null)
+            discoveryManager = FindObjectOfType<DiscoveryManager>();
+
+        discoveryManager.Initialize();
+        discoveryManager.RefreshRooms();
     }
 
     public void JoinFirstVisibleRoom()
     {
-        var rooms = CXRSDK.GetRooms();
+        var rooms = discoveryManager.GetRooms();
         if (rooms.Count > 0)
         {
-            CXRSDK.JoinRoom(rooms[0].RoomId);
+            discoveryManager.JoinRoom(rooms[0].RoomId);
         }
     }
 }

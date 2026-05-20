@@ -66,6 +66,10 @@ The prefab should include:
 - `discoveryBroadcaster`: publishes room metadata.
 - `autoCreateDiscoveryComponents`: creates missing discovery infrastructure on the manager object.
 
+**Single resolution point**: `XRNetworkManager` is the only component that resolves `DiscoveryBroadcaster` and `DiscoveryListener` (via `ResolveDiscoveryComponents()`). It then injects them into `RuntimeSessionSdkBridge`, `RemoteRoomRegistryPublisher`, and `HeadlessServerLauncher` through `Initialize()` methods. These sub-components no longer call `GetComponent`/`FindObjectOfType` for SDK discovery references.
+
+**Connection state isolation**: `XRConnectionStateProvider` is a non-MonoBehaviour class that wraps all Mirror static reads (`NetworkServer.active`, `NetworkClient.isConnected`, `NetworkClient.localPlayer`, `NetworkManager.singleton`). `XRMultiplayerRuntimeFacade` uses the provider instead of importing Mirror directly, ensuring that Mirror internals are not exposed through the public API boundary.
+
 ### Runtime Spawn Prefabs
 
 - `registerDefaultResourceSpawnPrefab`: registers the configured Resources prefab.

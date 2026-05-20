@@ -8,7 +8,7 @@ public sealed class HeadlessServerLauncherTests
     public void ParseCommandLine_ReadsServerConfiguration()
     {
         HeadlessServerConfig config =
-            HeadlessServerLauncher.ParseCommandLine(
+            CommandLineParser.Parse(
                 new[]
                 {
                     "App.exe",
@@ -38,7 +38,7 @@ public sealed class HeadlessServerLauncherTests
     public void ParseCommandLine_ReadsLinuxStyleArguments()
     {
         HeadlessServerConfig config =
-            HeadlessServerLauncher.ParseCommandLine(
+            CommandLineParser.Parse(
                 new[]
                 {
                     "./CXR_Backend.x86_64",

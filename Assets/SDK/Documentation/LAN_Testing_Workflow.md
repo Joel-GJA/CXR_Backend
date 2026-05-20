@@ -16,7 +16,7 @@ Use that path as the package source during development.
 2. Start Mirror host or server runtime.
 3. Ensure `DiscoveryBroadcaster` is active.
 4. Open a client scene in another Editor instance or a standalone build.
-5. Call `CXRSDK.Initialize()` and `CXRSDK.RefreshRooms()`.
+5. Ensure `DiscoveryManager` is in the scene and initialized (it initializes on Awake by default).
 6. Confirm the room appears in the browser UI.
 7. Join the discovered room.
 

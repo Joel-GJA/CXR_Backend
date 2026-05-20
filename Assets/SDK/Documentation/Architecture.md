@@ -9,10 +9,6 @@
 
 ## Runtime Modules
 
-### `CXRSDK`
-
-Static entry point for initialization, refresh, room retrieval, and join initiation.
-
 ### `DiscoveryManager`
 
 Client-facing lifecycle coordinator. It:
@@ -52,9 +48,9 @@ In-memory room cache. It:
 
 Small metadata container for server-side room attributes such as environment, mode, scenario, or institution-specific labels.
 
-### `SessionBrowser`
+### `TransportPortHelper`
 
-Developer-facing browser wrapper around `DiscoveryManager`.
+Utility for reading and writing the transport port on Mirror `Transport` instances. Used by both `DiscoveryBroadcaster` (to read the port for advertisements) and `JoinRoomHandler` (to set the client port before connecting). Eliminates fragile reflection patterns previously duplicated in those components.
 
 ### `JoinRoomHandler`
 

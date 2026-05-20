@@ -11,6 +11,8 @@ using UnityEngine.Networking;
 [DisallowMultipleComponent]
 public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 {
+    private const string RegistryUrlPrefsKey = "CXR_RemoteRegistry_Url";
+
     [SerializeField]
     private string registryUrl = string.Empty;
 
@@ -49,7 +51,18 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
     public string RegistryUrl
     {
         get => registryUrl;
-        set => registryUrl = NormalizeRegistryUrl(value);
+        set
+        {
+            string normalized = NormalizeRegistryUrl(value);
+            if (string.Equals(registryUrl, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            registryUrl = normalized;
+            PlayerPrefs.SetString(RegistryUrlPrefsKey, normalized);
+            PlayerPrefs.Save();
+        }
     }
 
     public bool HasRegistry =>
@@ -57,6 +70,12 @@ public sealed class RemoteRoomRegistryBrowser : MonoBehaviour
 
     private void Awake()
     {
+        string savedUrl = PlayerPrefs.GetString(RegistryUrlPrefsKey, string.Empty);
+        if (!string.IsNullOrWhiteSpace(savedUrl))
+        {
+            registryUrl = savedUrl;
+        }
+
         if (configureFromEnvironmentOrCommandLine)
         {
             ConfigureRegistryUrl();

@@ -31,7 +31,6 @@ This layer discovers LAN rooms and initiates joins. It is intentionally independ
 
 Key types:
 
-- `CXRSDK`: static SDK entry point for initialization, room refresh, room lookup, and join.
 - `DiscoveryManager`: client-side discovery lifecycle coordinator.
 - `DiscoveryListener`: Mirror discovery integration point for requests and responses.
 - `DiscoveryBroadcaster`: host/server advertisement helper.
@@ -78,16 +77,16 @@ The prefab layer gives teams concrete importable assets:
 
 ### Host or Server Start
 
-1. `XRNetworkManager.Awake` configures transport, scene flow, runtime components, discovery components, and spawn prefabs.
+1. `XRNetworkManager.Awake` configures transport, scene flow, runtime components, discovery components, and spawn prefabs. It resolves `DiscoveryBroadcaster` and `DiscoveryListener` once in `ResolveDiscoveryComponents()`, then injects them into all sub-components (`RuntimeSessionSdkBridge`, `RemoteRoomRegistryPublisher`, `HeadlessServerLauncher`) via `Initialize()` methods — eliminating duplicate `GetComponent` calls.
 2. `XRNetworkManager.OnStartServer` marks the server active.
 3. `RuntimeSessionManager.BeginServerSession` clears previous state and enters `WaitingForParticipants`.
-4. `RuntimeSessionSdkBridge` publishes room metadata through `DiscoveryBroadcaster`.
+4. `RuntimeSessionSdkBridge` publishes room metadata through `DiscoveryBroadcaster` (sole publisher — session state and participant metadata flow through the bridge's event subscriptions, not through `RuntimeSessionManager` directly).
 5. `DiscoveryBroadcaster` advertises room name, status, participant counts, and runtime metadata.
 
 ### Dedicated Headless Start
 
 1. A server build starts with `-batchmode -nographics` and optionally `-cxrHeadlessServer`.
-2. `HeadlessServerLauncher` parses environment variables and command-line room name, participant capacity, port, and metadata.
+2. `HeadlessServerLauncher` delegates to `CommandLineParser.Parse()` for environment variable and command-line configuration (room name, participant capacity, port, metadata, registry URL, public address).
 3. The launcher configures the Mirror transport, `DiscoveryBroadcaster`, and `RuntimeSessionSdkBridge`.
 4. The launcher starts Mirror server mode.
 5. The normal server session and discovery advertisement flow continues through `XRNetworkManager`.
@@ -117,7 +116,7 @@ The prefab layer gives teams concrete importable assets:
 3. `RuntimeSessionManager.RegisterParticipant` initializes and activates the participant.
 4. Participant info is stored by participant netId and connection ID.
 5. Session state transitions to `Active`.
-6. Runtime metadata is republished to discovery.
+6. `RuntimeSessionSdkBridge` republishes runtime metadata to discovery (via `ParticipantRegistered` event).
 
 ### Disconnect Cleanup
 
@@ -175,7 +174,7 @@ The prefab layer gives teams concrete importable assets:
 
 ## Public API Boundary
 
-Application UI should prefer `XRMultiplayerRuntimeFacade` instead of calling random infrastructure components directly.
+Application UI should prefer `XRMultiplayerRuntimeFacade` instead of calling random infrastructure components directly. The facade reads all Mirror connection state through `XRConnectionStateProvider` (which wraps `NetworkServer`/`NetworkClient` statics) — UI code never touches Mirror internals.
 
 The facade exposes:
 

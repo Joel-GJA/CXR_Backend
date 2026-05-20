@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using UnityEngine;
-using CXR.SDK.Browser;
 using CXR.SDK.Networking;
 using CXR.SDK.Rooms;
 using CXR.SDK.Utils;
@@ -32,15 +31,11 @@ namespace CXR.SDK.Discovery
 
         public bool IsInitialized => isInitialized;
 
-        public SessionBrowser Browser { get; private set; }
-
         public RoomRegistry Registry => roomRegistry;
 
         private void Awake()
         {
             EnsureDependencies();
-            Browser = new SessionBrowser(this);
-            CXRSDK.RegisterManager(this);
 
             if (initializeOnAwake)
             {
@@ -51,7 +46,6 @@ namespace CXR.SDK.Discovery
         private void OnDestroy()
         {
             Shutdown();
-            CXRSDK.UnregisterManager(this);
         }
 
         private void Update()

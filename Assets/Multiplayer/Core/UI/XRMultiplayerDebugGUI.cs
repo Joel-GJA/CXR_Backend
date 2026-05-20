@@ -30,11 +30,44 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
     [SerializeField]
     private string remoteRegistryUrl = string.Empty;
 
+    private const string DirectAddressPrefsKey = "CXR_DebugGUI_DirectAddress";
+    private const string RegistryUrlPrefsKey = "CXR_DebugGUI_RegistryUrl";
+
     private Vector2 scrollPosition;
 
     private void Awake()
     {
+        LoadPersistedUrls();
         ResolveReferences();
+    }
+
+    private void LoadPersistedUrls()
+    {
+        string savedAddress = PlayerPrefs.GetString(
+            DirectAddressPrefsKey, "localhost");
+        if (!string.IsNullOrWhiteSpace(savedAddress))
+        {
+            directConnectAddress = savedAddress;
+        }
+
+        string savedRegistryUrl = PlayerPrefs.GetString(
+            RegistryUrlPrefsKey, string.Empty);
+        if (!string.IsNullOrWhiteSpace(savedRegistryUrl))
+        {
+            remoteRegistryUrl = savedRegistryUrl;
+        }
+    }
+
+    private void SaveDirectConnectAddress()
+    {
+        PlayerPrefs.SetString(DirectAddressPrefsKey, directConnectAddress);
+        PlayerPrefs.Save();
+    }
+
+    private void SaveRegistryUrl()
+    {
+        PlayerPrefs.SetString(RegistryUrlPrefsKey, remoteRegistryUrl);
+        PlayerPrefs.Save();
     }
 
     private void Update()
@@ -96,6 +129,7 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
 
         if (GUILayout.Button("Client"))
         {
+            SaveDirectConnectAddress();
             runtimeFacade?.StartClient(directConnectAddress);
         }
         GUILayout.EndHorizontal();
@@ -216,11 +250,13 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         if (GUILayout.Button("Apply URL"))
         {
             runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+            SaveRegistryUrl();
         }
 
         if (GUILayout.Button("Refresh Registry"))
         {
             runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+            SaveRegistryUrl();
             runtimeFacade.RefreshRemoteRooms();
         }
         GUILayout.EndHorizontal();
@@ -228,6 +264,7 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         if (GUILayout.Button("Advertise Room"))
         {
             runtimeFacade.RemoteRegistryUrl = remoteRegistryUrl;
+            SaveRegistryUrl();
             runtimeFacade.PublishRoomToRegistry();
         }
     }
@@ -336,9 +373,6 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
             runtimeFacade = gameObject.AddComponent<XRMultiplayerRuntimeFacade>();
         }
 
-        if (runtimeFacade != null)
-        {
-            runtimeFacade.ResolveReferences();
-        }
+        // facade handles its own state internally
     }
 }
