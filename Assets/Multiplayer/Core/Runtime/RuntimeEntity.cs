@@ -13,6 +13,13 @@ public class RuntimeEntity : NetworkBehaviour
     private RuntimeEntityState currentState =
         RuntimeEntityState.Created;
 
+    [Header("Optimization")]
+    [Tooltip("Log lifecycle events (disable for short-lived objects like bullets)")]
+    public bool logLifecycle = true;
+
+    [Tooltip("Register in RuntimeEntityRegistry (disable when no lookups are needed)")]
+    public bool trackInRegistry = true;
+
     public RuntimeEntityState CurrentState => currentState;
 
     public bool HasOwner => ownerNetId != 0;
@@ -28,8 +35,8 @@ public class RuntimeEntity : NetworkBehaviour
     {
         if (isInitialized)
         {
-            Debug.LogWarning(
-                $"[ENTITY] Already Initialized | NetID={netId}");
+            if (logLifecycle)
+                Debug.LogWarning($"[ENTITY] Already Initialized | NetID={netId}");
 
             return;
         }
@@ -38,12 +45,11 @@ public class RuntimeEntity : NetworkBehaviour
 
         isInitialized = true;
 
-        TransitionState(RuntimeEntityState.Initialized);
+        if (logLifecycle)
+            TransitionState(RuntimeEntityState.Initialized);
 
-        Debug.Log(
-            $"[ENTITY] Initialized | " +
-            $"NetID={netId} | " +
-            $"Owner={ownerNetId}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] Initialized | NetID={netId} | Owner={ownerNetId}");
     }
 
     // =========================
@@ -53,41 +59,35 @@ public class RuntimeEntity : NetworkBehaviour
     [Server]
     public virtual void Activate()
     {
-        TransitionState(RuntimeEntityState.Active);
+        if (logLifecycle)
+            TransitionState(RuntimeEntityState.Active);
 
-        Debug.Log(
-            $"[ENTITY] Activated | NetID={netId}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] Activated | NetID={netId}");
     }
 
     [Server]
     public virtual void SetOwner(uint newOwnerNetId)
     {
         if (ownerNetId == newOwnerNetId)
-        {
             return;
-        }
 
         ownerNetId = newOwnerNetId;
 
-        Debug.Log(
-            $"[ENTITY] Ownership Changed | " +
-            $"NetID={netId} | " +
-            $"Owner={ownerNetId}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] Ownership Changed | NetID={netId} | Owner={ownerNetId}");
     }
 
     [Server]
     public virtual void ClearOwner()
     {
         if (ownerNetId == 0)
-        {
             return;
-        }
 
         ownerNetId = 0;
 
-        Debug.Log(
-            $"[ENTITY] Ownership Cleared | " +
-            $"NetID={netId}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] Ownership Cleared | NetID={netId}");
     }
 
     // =========================
@@ -105,10 +105,11 @@ public class RuntimeEntity : NetworkBehaviour
 
         ClearOwner();
 
-        TransitionState(RuntimeEntityState.CleaningUp);
+        if (logLifecycle)
+            TransitionState(RuntimeEntityState.CleaningUp);
 
-        Debug.Log(
-            $"[ENTITY] Cleanup | NetID={netId}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] Cleanup | NetID={netId}");
     }
 
     // =========================
@@ -119,22 +120,28 @@ public class RuntimeEntity : NetworkBehaviour
     {
         base.OnStartServer();
 
-        RuntimeEntityRegistry.Register(this);
+        if (trackInRegistry)
+            RuntimeEntityRegistry.Register(this);
 
-        TransitionState(RuntimeEntityState.Registered);
-
-        Debug.Log($"[ENTITY] Registered | NetID={netId}");
+        if (logLifecycle)
+        {
+            TransitionState(RuntimeEntityState.Registered);
+            Debug.Log($"[ENTITY] Registered | NetID={netId}");
+        }
     }
 
     public override void OnStopServer()
     {
         Cleanup();
 
-        RuntimeEntityRegistry.Unregister(this);
+        if (trackInRegistry)
+            RuntimeEntityRegistry.Unregister(this);
 
-        TransitionState(RuntimeEntityState.Destroyed);
-
-        Debug.Log($"[ENTITY] Unregistered | NetID={netId}");
+        if (logLifecycle)
+        {
+            TransitionState(RuntimeEntityState.Destroyed);
+            Debug.Log($"[ENTITY] Unregistered | NetID={netId}");
+        }
 
         base.OnStopServer();
     }
@@ -144,14 +151,11 @@ public class RuntimeEntity : NetworkBehaviour
     // =========================
 
     [Server]
-    protected virtual void TransitionState(
-        RuntimeEntityState newState)
+    protected virtual void TransitionState(RuntimeEntityState newState)
     {
         currentState = newState;
 
-        Debug.Log(
-            $"[ENTITY] State Changed | " +
-            $"NetID={netId} | " +
-            $"State={currentState}");
+        if (logLifecycle)
+            Debug.Log($"[ENTITY] State Changed | NetID={netId} | State={currentState}");
     }
 }

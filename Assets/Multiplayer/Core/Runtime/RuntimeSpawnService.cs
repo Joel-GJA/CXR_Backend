@@ -62,10 +62,14 @@ public static class RuntimeSpawnService
         // -------------------------
         // INITIALIZATION
         // -------------------------
+        //
+        // For short-lived objects (bullets, projectiles), set
+        // logLifecycle=false and trackInRegistry=false on the prefab
+        // to skip logging and registry overhead.
+        //
+        // -------------------------
 
         entity.Initialize(ownerNetId);
-
-        entity.SetOwner(ownerNetId);
 
         // -------------------------
         // STATE TRANSITION

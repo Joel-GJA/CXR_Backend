@@ -1,13 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using CXR.SDK;
+using CXR.SDK.Discovery;
 using CXR.SDK.Rooms;
 
 namespace CXR.SDK.Samples.RoomBrowserExample
 {
     public sealed class SampleRoomBrowserUI : MonoBehaviour
     {
+        [SerializeField] private DiscoveryManager discoveryManager;
         [SerializeField] private Transform roomListRoot;
         [SerializeField] private SampleRoomListItemView roomListItemPrefab;
         [SerializeField] private Text statusText;
@@ -17,34 +18,34 @@ namespace CXR.SDK.Samples.RoomBrowserExample
 
         private void OnEnable()
         {
-            CXRSDK.Initialize();
-            CXRSDK.Browser.RoomsChanged += HandleRoomsChanged;
+            if (discoveryManager == null)
+                discoveryManager = FindObjectOfType<DiscoveryManager>();
+
+            if (discoveryManager == null)
+                return;
+
+            discoveryManager.Initialize();
+            discoveryManager.RoomsChanged += HandleRoomsChanged;
 
             if (refreshButton != null)
-            {
                 refreshButton.onClick.AddListener(HandleRefreshClicked);
-            }
 
-            Redraw(CXRSDK.GetRooms());
+            Redraw(discoveryManager.GetRooms());
         }
 
         private void OnDisable()
         {
-            if (CXRSDK.IsInitialized)
-            {
-                CXRSDK.Browser.RoomsChanged -= HandleRoomsChanged;
-            }
+            if (discoveryManager != null)
+                discoveryManager.RoomsChanged -= HandleRoomsChanged;
 
             if (refreshButton != null)
-            {
                 refreshButton.onClick.RemoveListener(HandleRefreshClicked);
-            }
         }
 
         private void HandleRefreshClicked()
         {
             SetStatus("Refreshing LAN rooms...");
-            CXRSDK.RefreshRooms();
+            discoveryManager?.RefreshRooms();
         }
 
         private void HandleRoomsChanged(IReadOnlyList<RoomInfo> rooms)
@@ -75,11 +76,9 @@ namespace CXR.SDK.Samples.RoomBrowserExample
         private void HandleJoinRequested(RoomInfo room)
         {
             if (room == null)
-            {
                 return;
-            }
 
-            if (CXRSDK.JoinRoom(room.RoomId, out var error))
+            if (discoveryManager.JoinRoom(room.RoomId, out var error))
             {
                 SetStatus("Joining " + room.RoomName + "...");
                 return;
@@ -93,9 +92,7 @@ namespace CXR.SDK.Samples.RoomBrowserExample
             for (var index = 0; index < activeItems.Count; index++)
             {
                 if (activeItems[index] != null)
-                {
                     Destroy(activeItems[index].gameObject);
-                }
             }
 
             activeItems.Clear();
@@ -104,9 +101,7 @@ namespace CXR.SDK.Samples.RoomBrowserExample
         private void SetStatus(string message)
         {
             if (statusText != null)
-            {
                 statusText.text = message;
-            }
         }
     }
 }

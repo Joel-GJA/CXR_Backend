@@ -27,7 +27,7 @@ public sealed class XRMultiplayerRuntimeFacadeTests
             XRMultiplayerRuntimeFacade facade =
                 root.AddComponent<XRMultiplayerRuntimeFacade>();
 
-            facade.ResolveReferences();
+            // facade creates connection state provider in Awake
 
             Assert.NotNull(sessionManager);
             Assert.AreEqual(

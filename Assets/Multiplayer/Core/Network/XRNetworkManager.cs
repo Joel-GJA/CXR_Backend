@@ -341,15 +341,31 @@ public class XRNetworkManager : NetworkManager
 
         ResolveDiscoveryComponents();
 
-        if (discoveryListener != null &&
-            discoveryBroadcaster != null)
+        if (discoveryListener != null && discoveryBroadcaster != null)
         {
             discoveryListener.SetBroadcaster(discoveryBroadcaster);
         }
 
         if (sessionSdkBridge != null)
         {
-            sessionSdkBridge.InitializeForRuntime();
+            sessionSdkBridge.Initialize(discoveryBroadcaster, discoveryListener);
+        }
+
+        RemoteRoomRegistryPublisher registryPublisher =
+            GetComponent<RemoteRoomRegistryPublisher>();
+        if (registryPublisher != null)
+        {
+            registryPublisher.Initialize(discoveryBroadcaster);
+        }
+
+        HeadlessServerLauncher headlessLauncher =
+            GetComponent<HeadlessServerLauncher>();
+        if (headlessLauncher != null)
+        {
+            headlessLauncher.Initialize(
+                discoveryBroadcaster,
+                sessionSdkBridge,
+                registryPublisher);
         }
     }
 

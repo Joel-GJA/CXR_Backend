@@ -48,7 +48,7 @@ namespace CXR.SDK.Networking
 
             networkManager.networkAddress = room.IpAddress;
 
-            if (!TryAssignTransportPort(Transport.active, room.Port))
+            if (!TransportPortHelper.TrySetPort(Transport.active, room.Port))
             {
                 CXRLogger.Warn("Unable to set the active transport port automatically. Ensure your transport is configured for port " + room.Port + ".");
             }
@@ -56,39 +56,6 @@ namespace CXR.SDK.Networking
             CXRLogger.Info("Connecting to " + room.IpAddress + ":" + room.Port + ".");
             networkManager.StartClient();
             return true;
-        }
-
-        private static bool TryAssignTransportPort(Transport transport, int port)
-        {
-            if (transport == null)
-            {
-                return false;
-            }
-
-            var transportType = transport.GetType();
-            var property = transportType.GetProperty("Port") ??
-                           transportType.GetProperty("port") ??
-                           transportType.GetProperty("ServerPort") ??
-                           transportType.GetProperty("serverPort");
-
-            if (property != null && property.CanWrite)
-            {
-                property.SetValue(transport, Convert.ChangeType(port, property.PropertyType));
-                return true;
-            }
-
-            var field = transportType.GetField("Port") ??
-                        transportType.GetField("port") ??
-                        transportType.GetField("ServerPort") ??
-                        transportType.GetField("serverPort");
-
-            if (field != null)
-            {
-                field.SetValue(transport, Convert.ChangeType(port, field.FieldType));
-                return true;
-            }
-
-            return false;
         }
     }
 }

@@ -12,10 +12,10 @@ public sealed class RuntimeSessionSdkBridgeTests
         try
         {
             var sessionManager = root.AddComponent<RuntimeSessionManager>();
+            var broadcaster = root.AddComponent<DiscoveryBroadcaster>();
+            var listener = root.AddComponent<DiscoveryListener>();
             var bridge = root.AddComponent<RuntimeSessionSdkBridge>();
-            bridge.InitializeForRuntime();
-
-            var broadcaster = root.GetComponent<DiscoveryBroadcaster>();
+            bridge.Initialize(broadcaster, listener);
 
             Assert.NotNull(sessionManager);
             Assert.NotNull(bridge);
