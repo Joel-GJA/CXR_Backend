@@ -1,23 +1,19 @@
-using System.Collections.Generic;
 using Mirror;
 using UnityEngine;
-using UnityEngine.XR;
 
 [DefaultExecutionOrder(-100)]
 public class XRTrackingBridge : MonoBehaviour
 {
+    [Header("XR Origin Reference (the transform to move)")]
+    [SerializeField] private Transform xrOrigin;
+
     [Header("Source XR Transforms (from XROrigin)")]
     [SerializeField] private Transform headSource;
     [SerializeField] private Transform leftHandSource;
     [SerializeField] private Transform rightHandSource;
 
-    [Header("Movement")]
-    [SerializeField] private float moveSpeed = 3f;
-
-    [Header("XR Locomotion")]
-    [SerializeField] private float turnSpeed = 120f;
-
     [Header("Keyboard Fallback")]
+    [SerializeField] private float moveSpeed = 3f;
     [SerializeField] private float lookSpeed = 60f;
     [SerializeField] private KeyCode toggleKey = KeyCode.T;
 
@@ -28,26 +24,34 @@ public class XRTrackingBridge : MonoBehaviour
     private Transform cameraOffset;
     private float yaw;
     private float pitch;
-    private readonly List<InputDevice> inputDevices = new List<InputDevice>();
+
+    public void SetReferences(Transform origin, Transform head, Transform leftHand, Transform rightHand)
+    {
+        xrOrigin = origin;
+        headSource = head;
+        leftHandSource = leftHand;
+        rightHandSource = rightHand;
+        Initialize();
+    }
 
     private void Start()
+    {
+        Initialize();
+    }
+
+    private void Initialize()
     {
         if (headSource != null)
             xrCamera = headSource.GetComponent<Camera>();
 
-        cameraOffset = transform.Find("CameraOffset");
+        if (xrOrigin != null)
+            cameraOffset = xrOrigin.Find("CameraOffset");
 
         Camera fallback = Camera.main;
         if (fallback != null && fallback != xrCamera)
             fallback.gameObject.SetActive(false);
 
-        useKeyboardFallback = !XRSettings.isDeviceActive;
-
-        inputDevices.Clear();
-        InputDevices.GetDevices(inputDevices);
-        Debug.Log($"[XR_PRESENCE] XR devices found: {inputDevices.Count}");
-        foreach (InputDevice d in inputDevices)
-            Debug.Log($"[XR_PRESENCE]   Device: {d.name} characteristics={d.characteristics}");
+        useKeyboardFallback = true;
 
         if (xrCamera != null)
         {
@@ -69,13 +73,7 @@ public class XRTrackingBridge : MonoBehaviour
         }
 
         if (useKeyboardFallback)
-        {
             UpdateKeyboard();
-        }
-        else
-        {
-            UpdateXRLocomotion();
-        }
 
         if (!NetworkClient.active)
             return;
@@ -97,9 +95,7 @@ public class XRTrackingBridge : MonoBehaviour
 
         localXrRig = NetworkClient.localPlayer.GetComponent<XRParticipantRuntime>();
         if (localXrRig != null)
-        {
             Debug.Log("[XR_PRESENCE] XRTrackingBridge found local XRParticipantRuntime");
-        }
     }
 
     private void UpdateFromSources()
@@ -122,11 +118,13 @@ public class XRTrackingBridge : MonoBehaviour
 
     private void UpdateKeyboard()
     {
+        if (xrOrigin == null) return;
+
         yaw += Input.GetAxis("Mouse X") * lookSpeed * Time.deltaTime;
         pitch -= Input.GetAxis("Mouse Y") * lookSpeed * Time.deltaTime;
         pitch = Mathf.Clamp(pitch, -90f, 90f);
 
-        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        xrOrigin.rotation = Quaternion.Euler(0f, yaw, 0f);
 
         Vector3 move = Vector3.zero;
         if (Input.GetKey(KeyCode.W)) move += Vector3.forward;
@@ -137,14 +135,12 @@ public class XRTrackingBridge : MonoBehaviour
         float axisX = Input.GetAxis("Horizontal");
         float axisY = Input.GetAxis("Vertical");
         if (Mathf.Abs(axisX) > 0.1f || Mathf.Abs(axisY) > 0.1f)
-        {
             move += new Vector3(axisX, 0f, axisY);
-        }
 
         if (move != Vector3.zero)
         {
-            move = transform.rotation * move.normalized;
-            transform.position += move * (moveSpeed * Time.deltaTime);
+            move = xrOrigin.rotation * move.normalized;
+            xrOrigin.position += move * (moveSpeed * Time.deltaTime);
         }
 
         if (cameraOffset != null)
@@ -161,57 +157,6 @@ public class XRTrackingBridge : MonoBehaviour
 
         if (headSource != null && localXrRig != null)
             SyncTransform(headSource, localXrRig.HeadTransform);
-    }
-
-    private void UpdateXRLocomotion()
-    {
-        Transform head = headSource;
-        if (head == null) return;
-
-        Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
-        Vector3 right = Vector3.ProjectOnPlane(head.right, Vector3.up).normalized;
-
-        Vector2 moveInput = GetThumbstick(true);
-        if (moveInput == Vector2.zero)
-        {
-            float ax = Input.GetAxis("Horizontal");
-            float ay = Input.GetAxis("Vertical");
-            if (Mathf.Abs(ax) > 0.1f || Mathf.Abs(ay) > 0.1f)
-                moveInput = new Vector2(ax, ay);
-        }
-
-        if (moveInput != Vector2.zero)
-        {
-            Vector3 move = (forward * moveInput.y + right * moveInput.x) * (moveSpeed * Time.deltaTime);
-            transform.position += move;
-        }
-
-        Vector2 turnInput = GetThumbstick(false);
-        float turnAngle = turnInput.x * turnSpeed * Time.deltaTime;
-        if (Mathf.Abs(turnAngle) > 0.01f)
-        {
-            transform.Rotate(0f, turnAngle, 0f);
-        }
-    }
-
-    private Vector2 GetThumbstick(bool leftHand)
-    {
-        InputDeviceCharacteristics mask = InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Controller;
-        mask |= leftHand ? InputDeviceCharacteristics.Left : InputDeviceCharacteristics.Right;
-
-        InputDevices.GetDevices(inputDevices);
-        foreach (InputDevice device in inputDevices)
-        {
-            if ((device.characteristics & mask) == mask)
-            {
-                if (device.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 value) && value.sqrMagnitude > 0.001f)
-                {
-                    Debug.Log($"[XR_PRESENCE] {(leftHand ? "Left" : "Right")} thumbstick: {value}");
-                    return value;
-                }
-            }
-        }
-        return Vector2.zero;
     }
 
     private void FixCanvasForXR()
