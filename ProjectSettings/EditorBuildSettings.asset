@@ -20,4 +20,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Multiplayer/Testing/Scene/XRDiscoveryDebugHostScene.unity
     guid: 500f86598bca497589de0f7d2c2f96ae
+  - enabled: 1
+    path: Assets/Multiplayer/Scenes/testScene.unity
+    guid: 8b3fa446195f41147af371c77e7acebb
   m_configObjects: {}
