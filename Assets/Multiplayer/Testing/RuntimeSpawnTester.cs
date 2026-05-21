@@ -29,11 +29,11 @@ public class RuntimeSpawnTester : NetworkBehaviour
             CmdSpawnTestEntity();
         }
 
-        // Despawn owned entities
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            CmdDespawnOwnedEntities();
-        }
+        // Despawn owned entities (disabled — use RuntimeInteractableTester instead)
+        // if (Input.GetKeyDown(KeyCode.G))
+        // {
+        //     CmdDespawnOwnedEntities();
+        // }
     }
 
     // =========================
