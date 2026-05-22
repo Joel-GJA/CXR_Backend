@@ -71,7 +71,7 @@ public static class XRPresenceValidator
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
         Debug.Log($"{Label} XRTrackingBridge created and wired. References set in Inspector.");
     }
-
+        
     [MenuItem("Tools/XR Presence/Auto-Setup Tracking Bridge", validate = true)]
     private static bool AutoSetupTrackingBridgeValidate()
     {
