@@ -64,6 +64,11 @@ public class XRTrackingBridge : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (Input.GetKeyDown(KeyCode.F3)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartHost();
+        if (Input.GetKeyDown(KeyCode.F4)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartServer();
+        if (Input.GetKeyDown(KeyCode.F5)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartClient("localhost");
+        if (Input.GetKeyDown(KeyCode.F6)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.Stop();
+
         if (Input.GetKeyDown(toggleKey))
         {
             useKeyboardFallback = !useKeyboardFallback;

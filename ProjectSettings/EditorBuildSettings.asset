@@ -5,21 +5,24 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Scenes/LobbyScene.unity
     guid: 9f36ca2c919cc424bb38655e19474fe2
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Scenes/SessionScene.unity
     guid: 15adb26245c24513becdad41acf8e47b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/Test-RuntimeEntityLifecycle.unity
     guid: dad9d2b31b2f5eb4eb4dc7360677f183
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/XRDiscoveryDebugClientScene.unity
     guid: 32a020b9f3294ebd930632f81ec4d10b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/XRDiscoveryDebugHostScene.unity
     guid: 500f86598bca497589de0f7d2c2f96ae
+  - enabled: 1
+    path: Assets/Multiplayer/Scenes/XRPresenceTestScene.unity
+    guid: 8b3fa446195f41147af371c77e7acebb
   m_configObjects:
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: c06dc66f26ff0174789a7a20e0c9b213, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 1a68a45bdf5a8744fa90b5389eac7be9, type: 2}
