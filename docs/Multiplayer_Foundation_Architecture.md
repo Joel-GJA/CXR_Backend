@@ -60,6 +60,9 @@ Key types:
 - `RuntimeDiagnostics`: session snapshot and logging helper.
 - `HeadlessServerLauncher`: dedicated server launcher for batchmode and command-line configured server runs.
 - `XRMultiplayerDebugGUI`: immediate-mode debug GUI built on the facade.
+- `XRTrackingBridge`: bridge between XR Origin device tracking and the networked player prefab — synchronizes headset, controller, and root body transforms at 20 Hz.
+- `XRRuntimeParticipant`: XR-specific participant subclass that resolves HeadRoot/LeftHandRoot/RightHandRoot anchors.
+- `XRParticipantRuntime`: local vs remote rig separation — proxy spheres hidden for local player, shown for remote players.
 
 ### Prefab Layer
 
@@ -69,7 +72,7 @@ The prefab layer gives teams concrete importable assets:
 
 - `XRNetworkManager.prefab`: complete Mirror manager with KCP, runtime session, discovery, diagnostics, and registered spawn prefabs.
 - `XRMultiplayerDebugGUI.prefab`: debug and blueprint UI for connection, discovery, rooms, and session state.
-- `XRRuntimeParticipantRoot.prefab`: standard participant root with network components and XR extension anchors.
+- `XRRuntimeParticipantRoot.prefab`: standard participant root with network components, XR extension anchors, head/hand proxy spheres, Capsule body visualization, and root `NetworkTransformReliable` for body sync (ClientToServer, 20 Hz).
 - `RuntimeEntity.prefab`: minimal runtime object baseline.
 - `NetworkInteractableCube.prefab`: sample networked interactable entity pattern.
 
@@ -230,7 +233,7 @@ Build custom UI against `XRMultiplayerRuntimeFacade` and `XRRoomBrowserModel`. T
 
 - The package is LAN-first.
 - The default transport is KCP through Mirror.
-- Full XR hand/head sync is reserved for later work.
+- Full XR head/controller/hand sync is implemented in Phase 2 through `XRTrackingBridge`, `XRRuntimeParticipant`, and `XRParticipantRuntime`. Root body position is synced via `NetworkTransformReliable` on `XRRuntimeParticipantRoot` with a configurable head-to-body offset (default 1.6 m).
 - Dedicated headless launch support is implemented through `HeadlessServerLauncher`; full Ubuntu CLI build-to-client validation still needs to be performed on target machines.
 - `RuntimeSceneFlow` is currently a placeholder and should not be treated as a production scene controller.
 - `RuntimePrefabRegistry` is currently a serialized container only; active registration happens through `XRNetworkManager`.
