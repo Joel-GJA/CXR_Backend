@@ -5,25 +5,10 @@ public class RuntimeParticipant : RuntimeEntity
 {
     [Header("Extension Anchors")]
     [SerializeField]
-    private Transform headRoot;
-
-    [SerializeField]
-    private Transform leftHandRoot;
-
-    [SerializeField]
-    private Transform rightHandRoot;
-
-    [SerializeField]
     private Transform rigMount;
 
     [SerializeField]
     private Transform avatarVisualRoot;
-
-    public Transform HeadRoot => headRoot;
-
-    public Transform LeftHandRoot => leftHandRoot;
-
-    public Transform RightHandRoot => rightHandRoot;
 
     public Transform RigMount => rigMount;
 
@@ -109,17 +94,6 @@ public class RuntimeParticipant : RuntimeEntity
 
     private void ResolveAnchors(bool createMissing)
     {
-        headRoot = ResolveAnchor(headRoot, "HeadRoot", "", createMissing);
-        leftHandRoot = ResolveAnchor(
-            leftHandRoot,
-            "LeftHandRoot",
-            "",
-            createMissing);
-        rightHandRoot = ResolveAnchor(
-            rightHandRoot,
-            "RightHandRoot",
-            "",
-            createMissing);
         rigMount = ResolveAnchor(
             rigMount,
             "RigMount",
@@ -132,7 +106,7 @@ public class RuntimeParticipant : RuntimeEntity
             createMissing);
     }
 
-    private Transform ResolveAnchor(
+    protected Transform ResolveAnchor(
         Transform current,
         string primaryName,
         string fallbackName,

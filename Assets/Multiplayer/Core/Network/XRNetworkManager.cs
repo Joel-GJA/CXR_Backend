@@ -3,6 +3,10 @@ using CXR.SDK.Discovery;
 using Mirror;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [DisallowMultipleComponent]
 public class XRNetworkManager : NetworkManager
 {
@@ -77,6 +81,9 @@ public class XRNetworkManager : NetworkManager
     {
         base.Awake();
 
+        if (singleton != this)
+            return;
+
         ConfigureTransport();
         ConfigureSceneFlow();
         ResolveRuntimeInfrastructure();
@@ -100,6 +107,23 @@ public class XRNetworkManager : NetworkManager
         {
             onlineScene = sessionScene;
         }
+    }
+
+    public void SetSessionScene(string scenePath)
+    {
+        sessionScene = scenePath;
+        if (!string.IsNullOrWhiteSpace(sessionScene))
+            onlineScene = sessionScene;
+    }
+
+    public void LoadScene(string scenePath)
+    {
+        if (!NetworkServer.active)
+        {
+            Debug.LogWarning("[NETWORK] Cannot load scene — server is not active.");
+            return;
+        }
+        ServerChangeScene(scenePath);
     }
 
     private void ConfigureTransport()
@@ -174,6 +198,8 @@ public class XRNetworkManager : NetworkManager
         }
 
         Debug.Log("[SERVER] Runtime Started");
+
+        ValidateInteractableNetworkTransforms();
 
         PrintRuntimeState();
     }
@@ -449,6 +475,26 @@ public class XRNetworkManager : NetworkManager
         if (discoveryBroadcaster == null)
         {
             discoveryBroadcaster = GetComponent<DiscoveryBroadcaster>();
+        }
+    }
+
+    private void ValidateInteractableNetworkTransforms()
+    {
+        RuntimeInteractable[] interactables = FindObjectsByType<RuntimeInteractable>(
+            FindObjectsSortMode.None);
+
+        foreach (RuntimeInteractable interactable in interactables)
+        {
+            if (interactable.TryGetComponent(out NetworkTransformReliable ntr))
+            {
+                if (ntr.syncDirection != SyncDirection.ClientToServer)
+                {
+                    Debug.LogWarning(
+                        $"[SERVER] Interactable '{interactable.name}' " +
+                        $"has syncDirection={ntr.syncDirection}. " +
+                        $"Expected ClientToServer ({SyncDirection.ClientToServer}).");
+                }
+            }
         }
     }
 }
