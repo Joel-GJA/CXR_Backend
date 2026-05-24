@@ -17,11 +17,27 @@ public class RuntimeInteractable : RuntimeEntity
     [SerializeField]
     private Vector3 holdOffset = new Vector3(0f, 1.2f, 2f);
 
+    [Header("Physics Control")]
+    [SerializeField]
+    private bool disableGravityOnGrab = true;
+
+    [SerializeField]
+    private bool setKinematicOnGrab = false;
+
+    private Rigidbody rb;
+
+    public bool UseFollowOffset { get; set; } = true;
+
     public InteractableState CurrentInteractableState => interactableState;
     public uint HoldingPlayerNetId => holdingPlayerNetId;
     public bool IsGrabbed => interactableState == InteractableState.Grabbed;
 
     public event System.Action<InteractableState, InteractableState> InteractableStateChanged;
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+    }
 
     private void Update()
     {
@@ -40,8 +56,15 @@ public class RuntimeInteractable : RuntimeEntity
 
         if (IsGrabbed && isOwned)
         {
-            FollowHolder();
+            UpdateGrabbedBehavior();
         }
+    }
+
+    protected virtual void UpdateGrabbedBehavior()
+    {
+        if (!UseFollowOffset)
+            return;
+        FollowHolder();
     }
 
     private void FollowHolder()
@@ -176,6 +199,26 @@ public class RuntimeInteractable : RuntimeEntity
             $"[INTERACTION] State Changed | " +
             $"NetID={netId} | " +
             $"{oldState} -> {newState}");
+
+        if (rb == null)
+            return;
+
+        if (newState == InteractableState.Grabbed)
+        {
+            if (disableGravityOnGrab)
+                rb.useGravity = false;
+            if (setKinematicOnGrab)
+                rb.isKinematic = true;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        else if (newState == InteractableState.Idle)
+        {
+            if (disableGravityOnGrab)
+                rb.useGravity = true;
+            if (setKinematicOnGrab)
+                rb.isKinematic = false;
+        }
     }
 
     private void OnHoldingPlayerChanged(uint oldValue, uint newValue)
