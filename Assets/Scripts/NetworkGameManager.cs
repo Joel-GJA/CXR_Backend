@@ -5,9 +5,6 @@ public class NetworkGameManager : NetworkBehaviour
 {
     public static NetworkGameManager Instance { get; private set; }
 
-    [Header("Lobby Scene")]
-    [Scene] [SerializeField] private string lobbySceneName = "Assets/Multiplayer/Scenes/LobbyScene.unity";
-
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -63,16 +60,7 @@ public class NetworkGameManager : NetworkBehaviour
             return;
         }
 
-        string targetLobbyScene = string.IsNullOrWhiteSpace(lobbySceneName)
-            ? manager.offlineScene
-            : lobbySceneName;
-
-        if (!string.IsNullOrWhiteSpace(targetLobbyScene) && manager.offlineScene != targetLobbyScene)
-        {
-            manager.offlineScene = targetLobbyScene;
-        }
-
-        Debug.Log($"[SERVER] Closing session and returning everyone to lobby: {manager.offlineScene}");
+        Debug.Log($"[SERVER] Closing session and returning everyone to lobby.");
         manager.StopHost();
     }
 }

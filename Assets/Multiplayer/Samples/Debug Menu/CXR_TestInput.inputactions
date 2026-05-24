@@ -1,0 +1,34 @@
+{
+    "name": "CXR_TestInput",
+    "maps": [
+        {
+            "name": "XR Debug",
+            "id": "141a8eaf-1af5-4a52-ace2-0901e0359619",
+            "actions": [
+                {
+                    "name": "Toggle Menu",
+                    "type": "Button",
+                    "id": "c51b95c2-f8e0-4895-bd17-3746ab39f72a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "91e2e13f-9754-401c-b5b2-629d0c28d32b",
+                    "path": "<XRController>{LeftHand}/menuButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Menu",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}

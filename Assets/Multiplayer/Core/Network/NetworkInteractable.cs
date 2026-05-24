@@ -1,3 +1,3 @@
-public class NetworkInteractable : RuntimeEntity
+public class NetworkInteractable : RuntimeInteractable
 {
 }
