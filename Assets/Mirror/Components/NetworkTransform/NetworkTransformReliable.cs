@@ -351,6 +351,7 @@ namespace Mirror
             if (syncDirection != SyncDirection.ClientToServer) return;
 
             // protect against ever growing buffer size attacks
+            if (connectionToClient == null) return;
             if (serverSnapshots.Count >= connectionToClient.snapshotBufferSizeLimit) return;
 
             // 'only sync on change' needs a correction on every new move sequence.

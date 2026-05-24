@@ -68,28 +68,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   syncMethod: 0
-  syncDirection: 0
+  syncDirection: 1
   syncMode: 0
-  syncInterval: 0
+  syncInterval: 0.05
   target: {fileID: 5669621091103181470}
   updateMethod: 0
   syncPosition: 1
   syncRotation: 1
   syncScale: 0
   onlySyncOnChange: 1
-  compressRotation: 1
+  compressRotation: 0
   interpolatePosition: 1
   interpolateRotation: 1
-  interpolateScale: 1
+  interpolateScale: 0
   coordinateSpace: 0
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0
   overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
   onlySyncOnChangeCorrectionMultiplier: 2
-  rotationSensitivity: 0.01
-  positionPrecision: 0.01
-  scalePrecision: 0.01
+  rotationSensitivity: 0.001
+  positionPrecision: 0.001
+  scalePrecision: 0.001
 --- !u!54 &7534164105395222059
 Rigidbody:
   m_ObjectHideFlags: 0
