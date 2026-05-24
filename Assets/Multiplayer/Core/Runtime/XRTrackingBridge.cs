@@ -1,5 +1,7 @@
 using Mirror;
+using Unity.XR.CoreUtils;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
 
 [DefaultExecutionOrder(-100)]
 public class XRTrackingBridge : MonoBehaviour
@@ -11,6 +13,9 @@ public class XRTrackingBridge : MonoBehaviour
     [SerializeField] private Transform headSource;
     [SerializeField] private Transform leftHandSource;
     [SerializeField] private Transform rightHandSource;
+
+    [Header("Body Sync")]
+    [SerializeField] private float bodyHeightOffset = 1.6f;
 
     [Header("Keyboard Fallback")]
     [SerializeField] private float moveSpeed = 3f;
@@ -34,9 +39,35 @@ public class XRTrackingBridge : MonoBehaviour
         Initialize();
     }
 
+    public void AutoWire()
+    {
+        Transform origin = ResolveXROrigin();
+        if (origin == null)
+        {
+            Debug.LogWarning("[XR_BRIDGE] No XR Origin found in scene. Cannot auto-wire.");
+            return;
+        }
+
+        xrOrigin = origin;
+        headSource = ResolveCamera(origin);
+        ResolveControllers(origin, out Transform left, out Transform right);
+        if (left != null) leftHandSource = left;
+        if (right != null) rightHandSource = right;
+
+        Initialize();
+
+        Debug.Log($"[XR_BRIDGE] Auto-wired to {origin.name} | " +
+                  $"head={(headSource != null ? headSource.name : "null")} " +
+                  $"L={(leftHandSource != null ? leftHandSource.name : "null")} " +
+                  $"R={(rightHandSource != null ? rightHandSource.name : "null")}");
+    }
+
     private void Start()
     {
-        Initialize();
+        if (xrOrigin == null || headSource == null)
+            AutoWire();
+        else
+            Initialize();
     }
 
     private void Initialize()
@@ -51,7 +82,7 @@ public class XRTrackingBridge : MonoBehaviour
         if (fallback != null && fallback != xrCamera)
             fallback.gameObject.SetActive(false);
 
-        useKeyboardFallback = true;
+        useKeyboardFallback = false;
 
         if (xrCamera != null)
         {
@@ -62,13 +93,52 @@ public class XRTrackingBridge : MonoBehaviour
         FixCanvasForXR();
     }
 
+    public bool TryGetOrigin(out Transform origin)
+    {
+        origin = xrOrigin;
+        if (origin != null)
+            return true;
+        origin = ResolveXROrigin();
+        return origin != null;
+    }
+
+    private static Transform ResolveXROrigin()
+    {
+        GameObject origin = GameObject.Find("XR Origin (XR Rig)");
+        if (origin != null) return origin.transform;
+        origin = GameObject.Find("XR Origin");
+        if (origin != null) return origin.transform;
+        return Object.FindAnyObjectByType<XROrigin>()?.transform;
+    }
+
+    private static Transform ResolveCamera(Transform origin)
+    {
+        Camera cam = origin.GetComponentInChildren<Camera>();
+        return cam != null ? cam.transform : origin.Find("Camera Offset/Main Camera");
+    }
+
+    private static void ResolveControllers(Transform origin, out Transform left, out Transform right)
+    {
+        left = null;
+        right = null;
+
+        ActionBasedController[] controllers = origin.GetComponentsInChildren<ActionBasedController>();
+        foreach (ActionBasedController c in controllers)
+        {
+            if (c.name.ToLower().Contains("left"))
+                left = c.transform;
+            else if (c.name.ToLower().Contains("right"))
+                right = c.transform;
+        }
+
+        if (left == null)
+            left = origin.Find("Camera Offset/LeftHand Controller");
+        if (right == null)
+            right = origin.Find("Camera Offset/RightHand Controller");
+    }
+
     private void LateUpdate()
     {
-        if (Input.GetKeyDown(KeyCode.F3)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartHost();
-        if (Input.GetKeyDown(KeyCode.F4)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartServer();
-        if (Input.GetKeyDown(KeyCode.F5)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.StartClient("localhost");
-        if (Input.GetKeyDown(KeyCode.F6)) FindObjectOfType<XRMultiplayerRuntimeFacade>()?.Stop();
-
         if (Input.GetKeyDown(toggleKey))
         {
             useKeyboardFallback = !useKeyboardFallback;
@@ -106,7 +176,12 @@ public class XRTrackingBridge : MonoBehaviour
     private void UpdateFromSources()
     {
         if (headSource != null)
+        {
+            Vector3 bodyPos = headSource.position + Vector3.down * bodyHeightOffset;
+            Quaternion bodyRot = Quaternion.Euler(0f, headSource.eulerAngles.y, 0f);
+            localXrRig.transform.SetPositionAndRotation(bodyPos, bodyRot);
             SyncTransform(headSource, localXrRig.HeadTransform);
+        }
 
         if (leftHandSource != null)
             SyncTransform(leftHandSource, localXrRig.LeftHandTransform);
@@ -161,7 +236,12 @@ public class XRTrackingBridge : MonoBehaviour
         }
 
         if (headSource != null && localXrRig != null)
+        {
+            Vector3 bodyPos = headSource.position + Vector3.down * bodyHeightOffset;
+            Quaternion bodyRot = Quaternion.Euler(0f, headSource.eulerAngles.y, 0f);
+            localXrRig.transform.SetPositionAndRotation(bodyPos, bodyRot);
             SyncTransform(headSource, localXrRig.HeadTransform);
+        }
     }
 
     private void FixCanvasForXR()

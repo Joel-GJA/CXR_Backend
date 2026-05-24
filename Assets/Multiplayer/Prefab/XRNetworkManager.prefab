@@ -308,7 +308,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   enforceEventSystem: 1
-  createEventSystemIfMissing: 1
+  createEventSystemIfMissing: 0
   enforceAudioListener: 1
   createAudioListenerIfMissing: 1
 --- !u!114 &704447783714084905

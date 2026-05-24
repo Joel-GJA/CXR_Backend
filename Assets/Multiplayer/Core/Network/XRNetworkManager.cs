@@ -77,6 +77,9 @@ public class XRNetworkManager : NetworkManager
     {
         base.Awake();
 
+        if (singleton != this)
+            return;
+
         ConfigureTransport();
         ConfigureSceneFlow();
         ResolveRuntimeInfrastructure();
@@ -100,6 +103,23 @@ public class XRNetworkManager : NetworkManager
         {
             onlineScene = sessionScene;
         }
+    }
+
+    public void SetSessionScene(string scenePath)
+    {
+        sessionScene = scenePath;
+        if (!string.IsNullOrWhiteSpace(sessionScene))
+            onlineScene = sessionScene;
+    }
+
+    public void LoadScene(string scenePath)
+    {
+        if (!NetworkServer.active)
+        {
+            Debug.LogWarning("[NETWORK] Cannot load scene — server is not active.");
+            return;
+        }
+        ServerChangeScene(scenePath);
     }
 
     private void ConfigureTransport()

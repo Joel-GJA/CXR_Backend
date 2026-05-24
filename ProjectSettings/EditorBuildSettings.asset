@@ -8,16 +8,16 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Multiplayer/Scenes/LobbyScene.unity
     guid: 9f36ca2c919cc424bb38655e19474fe2
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Scenes/SessionScene.unity
     guid: 15adb26245c24513becdad41acf8e47b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/Test-RuntimeEntityLifecycle.unity
     guid: dad9d2b31b2f5eb4eb4dc7360677f183
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/XRDiscoveryDebugClientScene.unity
     guid: 32a020b9f3294ebd930632f81ec4d10b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Multiplayer/Testing/Scene/XRDiscoveryDebugHostScene.unity
     guid: 500f86598bca497589de0f7d2c2f96ae
   - enabled: 1

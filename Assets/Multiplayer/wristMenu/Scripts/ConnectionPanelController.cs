@@ -40,7 +40,7 @@ public class ConnectionPanelController : RuntimeFacadePanel
         }
     }
 
-    public void Initialize(XRMultiplayerRuntimeFacade facade)
+    public override void Initialize(XRMultiplayerRuntimeFacade facade)
     {
         runtimeFacade = facade;
     }

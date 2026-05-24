@@ -53,4 +53,12 @@ public class WristMenuController : MonoBehaviour
         HideAll();
         debugPanel.gameObject.SetActive(true);
     }
+
+    public void SetRuntimeFacade(XRMultiplayerRuntimeFacade facade)
+    {
+        runtimeFacade = facade;
+        connectionPanel.Initialize(facade);
+        registryPanel.Initialize(facade);
+        roomsPanel.Initialize(facade);
+    }
 }
