@@ -33,7 +33,7 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
     private const string DirectAddressPrefsKey = "CXR_DebugGUI_DirectAddress";
     private const string RegistryUrlPrefsKey = "CXR_DebugGUI_RegistryUrl";
 
-    private Vector2 scrollPosition;
+    private Vector2 mainScrollPosition;
 
     private void Awake()
     {
@@ -96,6 +96,8 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
 
     private void DrawWindow(int windowId)
     {
+        mainScrollPosition = GUILayout.BeginScrollView(mainScrollPosition);
+
         DrawNetworkLifecycle();
         GUILayout.Space(8f);
         DrawDiscoveryLifecycle();
@@ -105,6 +107,8 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
         DrawSessionSnapshot();
         GUILayout.Space(8f);
         DrawRoomBrowser();
+
+        GUILayout.EndScrollView();
 
         GUI.DragWindow(new Rect(0f, 0f, 10000f, 24f));
     }
@@ -285,17 +289,11 @@ public sealed class XRMultiplayerDebugGUI : MonoBehaviour
             return;
         }
 
-        scrollPosition = GUILayout.BeginScrollView(
-            scrollPosition,
-            GUILayout.Height(220f));
-
         int count = Mathf.Min(rooms.Count, Mathf.Max(1, maxVisibleRooms));
         for (int index = 0; index < count; index++)
         {
             DrawRoom(rooms[index]);
         }
-
-        GUILayout.EndScrollView();
     }
 
     private void DrawRoom(RoomInfo room)

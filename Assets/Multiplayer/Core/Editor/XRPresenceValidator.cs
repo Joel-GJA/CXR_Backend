@@ -35,8 +35,8 @@ public static class XRPresenceValidator
             Debug.LogWarning($"{Label} {issues} issue(s) found. See messages above.");
     }
 
-    [MenuItem("Tools/XR Presence/Auto-Setup Tracking Bridge", priority = 101)]
-    private static void AutoSetupTrackingBridge()
+    [MenuItem("Tools/XR Presence/Auto-Wire Tracking Bridge", priority = 101)]
+    private static void AutoWireTrackingBridge()
     {
         GameObject xrOrigin = FindXROrigin();
         if (xrOrigin == null)
@@ -45,37 +45,30 @@ public static class XRPresenceValidator
             return;
         }
 
-        Camera cam = xrOrigin.GetComponentInChildren<Camera>();
-        ActionBasedController[] controllers = xrOrigin.GetComponentsInChildren<ActionBasedController>();
-        Transform leftCtrl = null, rightCtrl = null;
-        foreach (ActionBasedController c in controllers)
+        XRTrackingBridge bridge = Object.FindObjectOfType<XRTrackingBridge>();
+        if (bridge == null)
         {
-            if (leftCtrl == null && c.name.ToLower().Contains("left")) leftCtrl = c.transform;
-            else if (rightCtrl == null && c.name.ToLower().Contains("right")) rightCtrl = c.transform;
+            GameObject bridgeGO = new GameObject("XRTrackingBridge");
+            Undo.RegisterCreatedObjectUndo(bridgeGO, "Create XRTrackingBridge");
+            bridge = bridgeGO.AddComponent<XRTrackingBridge>();
+            Selection.activeGameObject = bridgeGO;
+            Debug.Log($"{Label} Created new XRTrackingBridge.");
+        }
+        else
+        {
+            Undo.RecordObject(bridge, "Auto-Wire XRTrackingBridge");
+            Debug.Log($"{Label} Re-wiring existing XRTrackingBridge.");
         }
 
-        if (cam == null) { Debug.LogError($"{Label} No Camera found under XR Origin."); return; }
-
-        GameObject bridgeGO = new GameObject("XRTrackingBridge");
-        Undo.RegisterCreatedObjectUndo(bridgeGO, "Create XRTrackingBridge");
-        XRTrackingBridge bridge = bridgeGO.AddComponent<XRTrackingBridge>();
-
-        SerializedObject so = new SerializedObject(bridge);
-        so.FindProperty("xrOrigin").objectReferenceValue = xrOrigin.transform;
-        so.FindProperty("headSource").objectReferenceValue = cam.transform;
-        so.FindProperty("leftHandSource").objectReferenceValue = leftCtrl;
-        so.FindProperty("rightHandSource").objectReferenceValue = rightCtrl;
-        so.ApplyModifiedProperties();
-
-        Selection.activeGameObject = bridgeGO;
+        bridge.AutoWire();
+        EditorUtility.SetDirty(bridge);
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-        Debug.Log($"{Label} XRTrackingBridge created and wired. References set in Inspector.");
     }
-        
-    [MenuItem("Tools/XR Presence/Auto-Setup Tracking Bridge", validate = true)]
-    private static bool AutoSetupTrackingBridgeValidate()
+
+    [MenuItem("Tools/XR Presence/Auto-Wire Tracking Bridge", validate = true)]
+    private static bool AutoWireTrackingBridgeValidate()
     {
-        return FindXROrigin() != null && UnityEngine.Object.FindObjectOfType<XRTrackingBridge>() == null;
+        return FindXROrigin() != null;
     }
 
     private static int CheckXROrigin()
@@ -113,7 +106,7 @@ public static class XRPresenceValidator
         if (bridge == null)
         {
             Debug.LogWarning($"{Label} No XRTrackingBridge in scene. " +
-                "Use Tools > XR Presence > Auto-Setup Tracking Bridge to create one.");
+                "Use Tools > XR Presence > Auto-Wire Tracking Bridge to create one.");
             return 1;
         }
 

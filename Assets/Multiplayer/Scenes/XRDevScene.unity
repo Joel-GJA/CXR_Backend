@@ -320,7 +320,6 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  lobbySceneName: Assets/Multiplayer/Scenes/LobbyScene.unity
 --- !u!114 &225404861
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1503,18 +1502,6 @@ PrefabInstance:
     - target: {fileID: 841663735582544887, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
       propertyPath: m_Name
       value: XRNetworkManager
-      objectReference: {fileID: 0}
-    - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
-      propertyPath: onlineScene
-      value: Assets/Multiplayer/Scenes/XRDevScene.unity
-      objectReference: {fileID: 0}
-    - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
-      propertyPath: offlineScene
-      value: Assets/Multiplayer/Scenes/XRDevScene.unity
-      objectReference: {fileID: 0}
-    - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
-      propertyPath: configureSceneFlowOnAwake
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3476550637750821820, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
       propertyPath: m_LocalPosition.x
