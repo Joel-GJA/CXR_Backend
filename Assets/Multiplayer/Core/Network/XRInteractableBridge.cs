@@ -27,13 +27,15 @@ public class XRInteractableBridge : MonoBehaviour
 
     private void OnGrab(SelectEnterEventArgs args)
     {
-        Debug.Log($"[INTERACTION] XR Grab | Interactable={name}");
+        runtimeInteractable.UseFollowOffset = false;
+        Debug.Log($"[INTERACTION] XR Grab | Interactable={name} | FollowOffset=OFF");
         runtimeInteractable.LocalTryGrab();
     }
 
     private void OnRelease(SelectExitEventArgs args)
     {
-        Debug.Log($"[INTERACTION] XR Release | Interactable={name}");
+        Debug.Log($"[INTERACTION] XR Release | Interactable={name} | FollowOffset=ON");
         runtimeInteractable.LocalTryRelease();
+        runtimeInteractable.UseFollowOffset = true;
     }
 }

@@ -1189,6 +1189,7 @@ MonoBehaviour:
   headSource: {fileID: 677077965}
   leftHandSource: {fileID: 1531755493}
   rightHandSource: {fileID: 1751916373}
+  bodyHeightOffset: 1.6
   moveSpeed: 3
   lookSpeed: 60
   toggleKey: 116
@@ -1573,6 +1574,14 @@ PrefabInstance:
     - target: {fileID: 841663735582544887, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
       propertyPath: m_Name
       value: XRNetworkManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
+      propertyPath: onlineScene
+      value: Assets/Multiplayer/Scenes/XRPresenceTestScene.unity
+      objectReference: {fileID: 0}
+    - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
+      propertyPath: offlineScene
+      value: Assets/Multiplayer/Scenes/LobbyScene.unity
       objectReference: {fileID: 0}
     - target: {fileID: 1390526089383485935, guid: a21b1be26e8abf04991c939b8fb7442d, type: 3}
       propertyPath: sessionScene
