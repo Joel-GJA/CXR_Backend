@@ -22,7 +22,21 @@ The participant prefab should include:
 - `RuntimeParticipant`
 - `RuntimeParticipantInstaller`
 
-The current sample participant may also include movement, camera, collider, rigidbody, or spawn testing components for prototype validation. App teams can replace those with their own XR rig and gameplay systems.
+The current sample participant includes XR presence components (`XRParticipantRuntime`, optional `XRTrackingBridge` integration) and basic body visualization (Capsule under `AvatarVisualRoot`). App teams can extend or replace the body visual while keeping the XR sync infrastructure.
+
+## Required Components
+
+The participant prefab should include:
+
+- `NetworkIdentity`
+- `NetworkTransformReliable`
+- `RuntimeParticipant`
+- `RuntimeParticipantInstaller`
+
+For XR presence, the prefab adds:
+
+- `XRParticipantRuntime` — local/remote rig separation and proxy visibility.
+- `XRRuntimeParticipant` — resolves HeadRoot/LeftHandRoot/RightHandRoot anchors inherited from `RuntimeParticipant`.
 
 ## Standard Anchors
 
@@ -40,6 +54,29 @@ Use these anchors for app-specific XR content:
 - Controller or hand visuals under `LeftHandRoot` and `RightHandRoot`.
 - Local XR rig mounting under `RigMount`.
 - Avatar visuals under `AvatarVisualRoot`.
+
+The prefab includes proxy spheres under each anchor (HeadProxy, LeftHandProxy, RightHandProxy). These are disabled for the local player and enabled for remote players by `XRParticipantRuntime`.
+
+## Root Body Sync
+
+The root `NetworkTransformReliable` on the prefab syncs body position. `XRTrackingBridge` drives it each frame:
+
+```
+root.position = headSource.position + Vector3.down * bodyHeightOffset
+root.rotation  = Quaternion.Euler(0f, headSource.eulerAngles.y, 0f)
+```
+
+`bodyHeightOffset` defaults to 1.6 and is configurable on `XRTrackingBridge`. The Capsule under `AvatarVisualRoot` follows the root position to provide basic body visualization for remote players.
+
+## Local vs Remote Behavior
+
+`XRParticipantRuntime` separates local and remote rig behavior:
+
+| Event | Local Player | Remote Player |
+|-------|-------------|---------------|
+| `OnStartLocalPlayer()` | Hides head/hand proxy spheres | — |
+| `OnStartClient()` (not local) | — | Shows head/hand proxy spheres |
+| `OnStopClient()` | Logs cleanup | Logs cleanup |
 
 ## Server Registration Flow
 
