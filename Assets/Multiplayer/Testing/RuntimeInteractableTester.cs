@@ -84,7 +84,7 @@ public class RuntimeInteractableTester : MonoBehaviour
         if (Input.GetKeyDown(releaseKey) && heldObject != null)
         {
             Debug.Log($"[TESTER] Releasing | Target={heldObject.name}");
-            heldObject.LocalTryRelease();
+            heldObject.LocalTryRelease(heldObject.transform.position, Vector3.zero, Vector3.zero);
             heldObject = null;
         }
     }

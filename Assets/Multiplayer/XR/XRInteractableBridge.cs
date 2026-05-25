@@ -1,16 +1,20 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 
 [RequireComponent(typeof(XRGrabInteractable), typeof(RuntimeInteractable))]
 public class XRInteractableBridge : MonoBehaviour
 {
     private XRGrabInteractable xrGrab;
     private RuntimeInteractable runtimeInteractable;
+    private AttachPointVelocityTracker velocityTracker;
+    private bool wasSelected;
 
     private void Awake()
     {
         xrGrab = GetComponent<XRGrabInteractable>();
         runtimeInteractable = GetComponent<RuntimeInteractable>();
+        velocityTracker = new AttachPointVelocityTracker();
 
         if (Application.isBatchMode)
             enabled = false;
@@ -28,17 +32,36 @@ public class XRInteractableBridge : MonoBehaviour
         xrGrab.selectExited.RemoveListener(OnRelease);
     }
 
+    private void Update()
+    {
+        if (xrGrab.isSelected)
+        {
+            if (!wasSelected)
+            {
+                velocityTracker = new AttachPointVelocityTracker();
+                wasSelected = true;
+            }
+            velocityTracker.UpdateAttachPointVelocityData(transform);
+        }
+        else
+        {
+            wasSelected = false;
+        }
+    }
+
     private void OnGrab(SelectEnterEventArgs args)
     {
-        runtimeInteractable.UseFollowOffset = false;
-        Debug.Log($"[INTERACTION] XR Grab | Interactable={name} | FollowOffset=OFF");
         runtimeInteractable.LocalTryGrab();
     }
 
     private void OnRelease(SelectExitEventArgs args)
     {
-        Debug.Log($"[INTERACTION] XR Release | Interactable={name} | FollowOffset=ON");
-        runtimeInteractable.LocalTryRelease();
-        runtimeInteractable.UseFollowOffset = true;
+        Vector3 velocity = velocityTracker.GetAttachPointVelocity();
+        Vector3 angularVelocity = velocityTracker.GetAttachPointAngularVelocity();
+        runtimeInteractable.LocalTryRelease(
+            transform.position,
+            transform.rotation,
+            velocity,
+            angularVelocity);
     }
 }

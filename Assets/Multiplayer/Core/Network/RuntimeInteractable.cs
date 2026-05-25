@@ -1,6 +1,7 @@
 using Mirror;
 using UnityEngine;
 
+[DefaultExecutionOrder(100)]
 public class RuntimeInteractable : RuntimeEntity
 {
     [Header("Interaction State")]
@@ -10,13 +11,6 @@ public class RuntimeInteractable : RuntimeEntity
     [SyncVar(hook = nameof(OnHoldingPlayerChanged))]
     private uint holdingPlayerNetId;
 
-    [Header("Follow")]
-    [SerializeField]
-    private float followSpeed = 15f;
-
-    [SerializeField]
-    private Vector3 holdOffset = new Vector3(0f, 1.2f, 2f);
-
     [Header("Physics Control")]
     [SerializeField]
     private bool disableGravityOnGrab = true;
@@ -24,9 +18,24 @@ public class RuntimeInteractable : RuntimeEntity
     [SerializeField]
     private bool setKinematicOnGrab = false;
 
-    private Rigidbody rb;
+    [Header("Release Validation")]
+    [SerializeField]
+    private float maxReleaseDistanceFromHolder = 4f;
 
-    public bool UseFollowOffset { get; set; } = true;
+    [SerializeField]
+    private float releaseDepenetrationPadding = 0.02f;
+
+    [SerializeField]
+    private int releaseDepenetrationIterations = 4;
+
+    [SerializeField]
+    private float maxReleaseVelocity = 12f;
+
+    [SerializeField]
+    private float maxReleaseAngularVelocity = 25f;
+
+    private Rigidbody rb;
+    private Collider objectCollider;
 
     public InteractableState CurrentInteractableState => interactableState;
     public uint HoldingPlayerNetId => holdingPlayerNetId;
@@ -37,6 +46,7 @@ public class RuntimeInteractable : RuntimeEntity
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        objectCollider = GetComponent<Collider>();
     }
 
     private void Update()
@@ -51,30 +61,8 @@ public class RuntimeInteractable : RuntimeEntity
 
         if (Input.GetKeyDown(KeyCode.R) && IsGrabbed && isOwned)
         {
-            LocalTryRelease();
+            LocalTryRelease(transform.position, Vector3.zero, Vector3.zero);
         }
-
-        if (IsGrabbed && isOwned)
-        {
-            UpdateGrabbedBehavior();
-        }
-    }
-
-    protected virtual void UpdateGrabbedBehavior()
-    {
-        if (!UseFollowOffset)
-            return;
-        FollowHolder();
-    }
-
-    private void FollowHolder()
-    {
-        if (!NetworkClient.spawned.TryGetValue(holdingPlayerNetId, out NetworkIdentity holderIdentity))
-            return;
-
-        Transform holder = holderIdentity.transform;
-        Vector3 target = holder.position + holder.TransformDirection(holdOffset);
-        transform.position = Vector3.Lerp(transform.position, target, followSpeed * Time.deltaTime);
     }
 
     public void LocalTryGrab()
@@ -87,10 +75,32 @@ public class RuntimeInteractable : RuntimeEntity
 
     public void LocalTryRelease()
     {
+        LocalTryRelease(
+            transform.position,
+            transform.rotation,
+            Vector3.zero,
+            Vector3.zero);
+    }
+
+    public void LocalTryRelease(Vector3 releasePosition, Vector3 velocity, Vector3 angularVelocity)
+    {
+        LocalTryRelease(releasePosition, transform.rotation, velocity, angularVelocity);
+    }
+
+    public void LocalTryRelease(
+        Vector3 releasePosition,
+        Quaternion releaseRotation,
+        Vector3 velocity,
+        Vector3 angularVelocity)
+    {
         if (!isClient || !IsGrabbed || !isOwned)
             return;
 
-        CmdRequestRelease();
+        CmdRequestRelease(
+            releasePosition,
+            releaseRotation,
+            velocity,
+            angularVelocity);
     }
 
     public override void OnStartServer()
@@ -130,7 +140,11 @@ public class RuntimeInteractable : RuntimeEntity
     }
 
     [Command(requiresAuthority = true)]
-    public void CmdRequestRelease()
+    public void CmdRequestRelease(
+        Vector3 finalPosition,
+        Quaternion finalRotation,
+        Vector3 velocity,
+        Vector3 angularVelocity)
     {
         if (interactableState != InteractableState.Grabbed)
         {
@@ -142,6 +156,29 @@ public class RuntimeInteractable : RuntimeEntity
         }
 
         uint releasedBy = holdingPlayerNetId;
+        Vector3 validatedPosition = ValidateReleasePosition(
+            finalPosition,
+            finalRotation,
+            releasedBy);
+        Vector3 clampedVelocity = Vector3.ClampMagnitude(
+            velocity,
+            maxReleaseVelocity);
+        Vector3 clampedAngularVelocity = Vector3.ClampMagnitude(
+            angularVelocity,
+            maxReleaseAngularVelocity);
+
+        if (rb != null)
+        {
+            rb.position = validatedPosition;
+            rb.rotation = finalRotation;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        else
+        {
+            transform.SetPositionAndRotation(validatedPosition, finalRotation);
+        }
+        Physics.SyncTransforms();
 
         interactableState = InteractableState.Releasing;
 
@@ -150,10 +187,25 @@ public class RuntimeInteractable : RuntimeEntity
         holdingPlayerNetId = 0;
         interactableState = InteractableState.Idle;
 
+        ApplyServerReleasedPhysics(clampedVelocity, clampedAngularVelocity);
+
+        // Teleport ALL clients to the server-verified release position via NTR.
+        if (TryGetComponent(out NetworkTransformReliable ntr))
+        {
+            ntr.RpcTeleport(
+                rb != null ? rb.position : transform.position,
+                rb != null ? rb.rotation : transform.rotation);
+            ntr.SetDirty();
+        }
+
         Debug.Log(
             $"[OWNERSHIP] Authority Released | " +
             $"InteractableNetID={netId} | " +
-            $"ReleasedBy={releasedBy}");
+            $"ReleasedBy={releasedBy} | " +
+            $"finalPos={finalPosition} | " +
+            $"validatedPos={validatedPosition} | " +
+            $"vel={clampedVelocity} | " +
+            $"angVel={clampedAngularVelocity}");
     }
 
     [Server]
@@ -219,12 +271,9 @@ public class RuntimeInteractable : RuntimeEntity
         {
             bool wasGravity = rb.useGravity;
             bool wasKinematic = rb.isKinematic;
-            if (disableGravityOnGrab)
-                rb.useGravity = false;
-            if (setKinematicOnGrab)
-                rb.isKinematic = true;
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+
+            ApplyGrabPhysics();
+
             Debug.Log(
                 $"[INTERACTION] Physics Applied G | " +
                 $"NetID={netId} | " +
@@ -233,17 +282,21 @@ public class RuntimeInteractable : RuntimeEntity
         }
         else if (newState == InteractableState.Idle)
         {
-            bool wasGravity = rb.useGravity;
-            bool wasKinematic = rb.isKinematic;
-            if (disableGravityOnGrab)
-                rb.useGravity = true;
-            if (setKinematicOnGrab)
-                rb.isKinematic = false;
+            if (isServer)
+            {
+                ApplyServerIdlePhysics();
+            }
+            else
+            {
+                ApplyRemoteIdlePhysics();
+            }
+
             Debug.Log(
                 $"[INTERACTION] Physics Applied I | " +
                 $"NetID={netId} | " +
-                $"gravity={wasGravity}->{rb.useGravity} | " +
-                $"kinematic={wasKinematic}->{rb.isKinematic}");
+                $"gravity={rb.useGravity} | " +
+                $"kinematic={rb.isKinematic} | " +
+                $"isServer={isServer}");
         }
     }
 
@@ -253,5 +306,139 @@ public class RuntimeInteractable : RuntimeEntity
             $"[OWNERSHIP] Holding Player Changed | " +
             $"NetID={netId} | " +
             $"{oldValue} -> {newValue}");
+    }
+
+    private void ApplyGrabPhysics()
+    {
+        if (rb == null)
+            return;
+
+        if (disableGravityOnGrab)
+            rb.useGravity = false;
+        if (setKinematicOnGrab)
+            rb.isKinematic = true;
+
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+    }
+
+    private void ApplyServerIdlePhysics()
+    {
+        if (rb == null)
+            return;
+
+        if (setKinematicOnGrab)
+            rb.isKinematic = false;
+        if (disableGravityOnGrab)
+            rb.useGravity = true;
+    }
+
+    private void ApplyServerReleasedPhysics(
+        Vector3 velocity,
+        Vector3 angularVelocity)
+    {
+        if (rb == null)
+            return;
+
+        ApplyServerIdlePhysics();
+        rb.WakeUp();
+        rb.velocity = velocity;
+        rb.angularVelocity = angularVelocity;
+    }
+
+    private void ApplyRemoteIdlePhysics()
+    {
+        if (rb == null)
+            return;
+
+        rb.useGravity = false;
+        rb.isKinematic = true;
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+    }
+
+    [Server]
+    private Vector3 ValidateReleasePosition(
+        Vector3 requestedPosition,
+        Quaternion requestedRotation,
+        uint releasedBy)
+    {
+        Vector3 position = ClampReleaseDistanceFromHolder(
+            requestedPosition,
+            releasedBy);
+
+        if (objectCollider == null)
+            return position;
+
+        Bounds bounds = objectCollider.bounds;
+        Vector3 localOffset = transform.InverseTransformPoint(bounds.center);
+        Vector3 halfExtents = bounds.extents + Vector3.one * releaseDepenetrationPadding;
+
+        for (int index = 0; index < releaseDepenetrationIterations; index++)
+        {
+            Vector3 center = position + requestedRotation * localOffset;
+            Collider[] overlaps = Physics.OverlapBox(
+                center,
+                halfExtents,
+                requestedRotation,
+                Physics.AllLayers,
+                QueryTriggerInteraction.Ignore);
+
+            bool resolvedAnyOverlap = false;
+
+            foreach (Collider overlap in overlaps)
+            {
+                if (overlap == null ||
+                    overlap == objectCollider ||
+                    overlap.transform.IsChildOf(transform) ||
+                    transform.IsChildOf(overlap.transform))
+                {
+                    continue;
+                }
+
+                if (Physics.ComputePenetration(
+                    objectCollider,
+                    position,
+                    requestedRotation,
+                    overlap,
+                    overlap.transform.position,
+                    overlap.transform.rotation,
+                    out Vector3 direction,
+                    out float distance))
+                {
+                    position += direction * (distance + releaseDepenetrationPadding);
+                    resolvedAnyOverlap = true;
+                }
+            }
+
+            if (!resolvedAnyOverlap)
+                break;
+        }
+
+        return position;
+    }
+
+    [Server]
+    private Vector3 ClampReleaseDistanceFromHolder(
+        Vector3 requestedPosition,
+        uint releasedBy)
+    {
+        if (maxReleaseDistanceFromHolder <= 0f ||
+            releasedBy == 0 ||
+            !NetworkServer.spawned.TryGetValue(
+                releasedBy,
+                out NetworkIdentity holderIdentity))
+        {
+            return requestedPosition;
+        }
+
+        Vector3 holderPosition = holderIdentity.transform.position;
+        Vector3 holderToRelease = requestedPosition - holderPosition;
+
+        if (holderToRelease.magnitude <= maxReleaseDistanceFromHolder)
+            return requestedPosition;
+
+        return holderPosition +
+            holderToRelease.normalized * maxReleaseDistanceFromHolder;
     }
 }
