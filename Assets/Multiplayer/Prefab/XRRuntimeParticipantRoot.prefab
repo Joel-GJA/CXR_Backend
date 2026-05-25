@@ -284,8 +284,8 @@ MonoBehaviour:
   syncScale: 0
   onlySyncOnChange: 1
   compressRotation: 1
-  interpolatePosition: 1
-  interpolateRotation: 1
+  interpolatePosition: 0
+  interpolateRotation: 0
   interpolateScale: 1
   coordinateSpace: 0
   timelineOffset: 1

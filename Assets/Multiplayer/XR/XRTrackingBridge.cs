@@ -30,6 +30,12 @@ public class XRTrackingBridge : MonoBehaviour
     private float yaw;
     private float pitch;
 
+    private void Awake()
+    {
+        if (Application.isBatchMode)
+            enabled = false;
+    }
+
     public void SetReferences(Transform origin, Transform head, Transform leftHand, Transform rightHand)
     {
         xrOrigin = origin;
@@ -139,6 +145,8 @@ public class XRTrackingBridge : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (!enabled) return;
+
         if (Input.GetKeyDown(toggleKey))
         {
             useKeyboardFallback = !useKeyboardFallback;

@@ -18,6 +18,9 @@ public class WristMenuController : MonoBehaviour
     private debugPanelController debugPanel;
     private void Awake()
     {
+        if (runtimeFacade == null)
+            runtimeFacade = FindObjectOfType<XRMultiplayerRuntimeFacade>();
+
         connectionPanel.Initialize(runtimeFacade);
         registryPanel.Initialize(runtimeFacade);
         roomsPanel.Initialize(runtimeFacade);

@@ -11,6 +11,9 @@ public class XRInteractableBridge : MonoBehaviour
     {
         xrGrab = GetComponent<XRGrabInteractable>();
         runtimeInteractable = GetComponent<RuntimeInteractable>();
+
+        if (Application.isBatchMode)
+            enabled = false;
     }
 
     private void OnEnable()
