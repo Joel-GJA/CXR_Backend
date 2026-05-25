@@ -35,7 +35,8 @@ public class RuntimeInteractable : RuntimeEntity
     private float maxReleaseAngularVelocity = 25f;
 
     private Rigidbody rb;
-    private Collider objectCollider;
+    private Collider[] objectColliders;
+    private readonly Collider[] overlapBuffer = new Collider[32];
     private double validateReleasedUntil = double.NegativeInfinity;
 
     private const float PostReleaseValidationSeconds = 2f;
@@ -54,7 +55,13 @@ public class RuntimeInteractable : RuntimeEntity
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        objectCollider = GetComponent<Collider>();
+        RefreshColliderCache();
+        ApplyRigidbodyDefaults();
+    }
+
+    private void OnTransformChildrenChanged()
+    {
+        RefreshColliderCache();
     }
 
     private void Update()
@@ -393,7 +400,7 @@ public class RuntimeInteractable : RuntimeEntity
             requestedPosition,
             releasedBy);
 
-        if (objectCollider == null)
+        if (!HasUsableColliders())
             return position;
 
         return ResolvePenetration(
@@ -405,7 +412,7 @@ public class RuntimeInteractable : RuntimeEntity
     [Server]
     private void StabilizeReleasedPose()
     {
-        if (rb == null || objectCollider == null)
+        if (rb == null || !HasUsableColliders())
             return;
 
         if (rb.velocity.magnitude > StabilizationMaxSpeed)
@@ -437,53 +444,63 @@ public class RuntimeInteractable : RuntimeEntity
     {
         Vector3 position = requestedPosition;
 
-        Bounds bounds = objectCollider.bounds;
-        Vector3 localOffset = transform.InverseTransformPoint(bounds.center);
-        Vector3 halfExtents = bounds.extents + Vector3.one * releaseDepenetrationPadding;
-
         for (int index = 0; index < releaseDepenetrationIterations; index++)
         {
-            Vector3 center = position + requestedRotation * localOffset;
-            Collider[] overlaps = Physics.OverlapBox(
-                center,
-                halfExtents,
-                requestedRotation,
-                Physics.AllLayers,
-                QueryTriggerInteraction.Ignore);
-
             bool resolvedAnyOverlap = false;
 
-            foreach (Collider overlap in overlaps)
+            foreach (Collider sourceCollider in objectColliders)
             {
-                if (overlap == null ||
-                    overlap == objectCollider ||
-                    overlap.transform.IsChildOf(transform) ||
-                    transform.IsChildOf(overlap.transform) ||
-                    (!includeDynamicRigidbodies && IsDynamicRigidbodyCollider(overlap)))
+                if (!IsUsableOwnCollider(sourceCollider))
                 {
                     continue;
                 }
 
-                if (Physics.ComputePenetration(
-                    objectCollider,
+                GetColliderPose(
+                    sourceCollider,
                     position,
                     requestedRotation,
-                    overlap,
-                    overlap.transform.position,
-                    overlap.transform.rotation,
-                    out Vector3 direction,
-                    out float distance))
+                    out Vector3 colliderPosition,
+                    out Quaternion colliderRotation);
+
+                int overlapCount = Physics.OverlapSphereNonAlloc(
+                    colliderPosition,
+                    GetBroadphaseRadius(sourceCollider),
+                    overlapBuffer,
+                    Physics.AllLayers,
+                    QueryTriggerInteraction.Ignore);
+
+                for (int overlapIndex = 0; overlapIndex < overlapCount; overlapIndex++)
                 {
-                    if (distance <= minPenetration)
+                    Collider overlap = overlapBuffer[overlapIndex];
+
+                    if (overlap == null ||
+                        IsOwnCollider(overlap) ||
+                        (!includeDynamicRigidbodies && IsDynamicRigidbodyCollider(overlap)))
                     {
                         continue;
                     }
 
-                    float correctionDistance = Mathf.Min(
-                        distance + releaseDepenetrationPadding,
-                        maxCorrectionPerStep);
-                    position += direction * correctionDistance;
-                    resolvedAnyOverlap = true;
+                    if (Physics.ComputePenetration(
+                        sourceCollider,
+                        colliderPosition,
+                        colliderRotation,
+                        overlap,
+                        overlap.transform.position,
+                        overlap.transform.rotation,
+                        out Vector3 direction,
+                        out float distance))
+                    {
+                        if (distance <= minPenetration)
+                        {
+                            continue;
+                        }
+
+                        float correctionDistance = Mathf.Min(
+                            distance + releaseDepenetrationPadding,
+                            maxCorrectionPerStep);
+                        position += direction * correctionDistance;
+                        resolvedAnyOverlap = true;
+                    }
                 }
             }
 
@@ -498,14 +515,13 @@ public class RuntimeInteractable : RuntimeEntity
     private void SnapToGroundIfSettled()
     {
         if (rb == null ||
-            objectCollider == null ||
+            !TryGetCombinedColliderBounds(out Bounds bounds) ||
             GroundSnapDistance <= 0f ||
             rb.velocity.magnitude > GroundSnapMaxSpeed)
         {
             return;
         }
 
-        Bounds bounds = objectCollider.bounds;
         float rayDistance = bounds.extents.y + GroundSnapDistance;
 
         if (!Physics.Raycast(
@@ -519,9 +535,7 @@ public class RuntimeInteractable : RuntimeEntity
             return;
         }
 
-        if (hit.collider == objectCollider ||
-            hit.collider.transform.IsChildOf(transform) ||
-            transform.IsChildOf(hit.collider.transform) ||
+        if (IsOwnCollider(hit.collider) ||
             IsDynamicRigidbodyCollider(hit.collider))
         {
             return;
@@ -535,6 +549,97 @@ public class RuntimeInteractable : RuntimeEntity
 
         rb.position += Vector3.up * correction;
         Physics.SyncTransforms();
+    }
+
+    private bool HasUsableColliders()
+    {
+        if (objectColliders == null || objectColliders.Length == 0)
+            return false;
+
+        foreach (Collider collider in objectColliders)
+        {
+            if (IsUsableOwnCollider(collider))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsUsableOwnCollider(Collider collider)
+    {
+        return collider != null &&
+            collider.enabled &&
+            !collider.isTrigger &&
+            IsOwnCollider(collider);
+    }
+
+    private bool IsOwnCollider(Collider collider)
+    {
+        return collider != null &&
+            (collider.transform == transform ||
+            collider.transform.IsChildOf(transform));
+    }
+
+    private void RefreshColliderCache()
+    {
+        objectColliders = GetComponentsInChildren<Collider>();
+    }
+
+    private void ApplyRigidbodyDefaults()
+    {
+        if (rb == null)
+            return;
+
+        if (rb.interpolation == RigidbodyInterpolation.None)
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        if (rb.collisionDetectionMode == CollisionDetectionMode.Discrete)
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    }
+
+    private void GetColliderPose(
+        Collider collider,
+        Vector3 rootPosition,
+        Quaternion rootRotation,
+        out Vector3 colliderPosition,
+        out Quaternion colliderRotation)
+    {
+        Vector3 localPosition = transform.InverseTransformPoint(
+            collider.transform.position);
+        Quaternion localRotation =
+            Quaternion.Inverse(transform.rotation) * collider.transform.rotation;
+
+        colliderPosition = rootPosition + rootRotation * localPosition;
+        colliderRotation = rootRotation * localRotation;
+    }
+
+    private float GetBroadphaseRadius(Collider collider)
+    {
+        return collider.bounds.extents.magnitude + releaseDepenetrationPadding;
+    }
+
+    private bool TryGetCombinedColliderBounds(out Bounds combinedBounds)
+    {
+        combinedBounds = default;
+        bool hasBounds = false;
+
+        foreach (Collider collider in objectColliders)
+        {
+            if (!IsUsableOwnCollider(collider))
+                continue;
+
+            if (!hasBounds)
+            {
+                combinedBounds = collider.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(collider.bounds);
+            }
+        }
+
+        return hasBounds;
     }
 
     private bool IsDynamicRigidbodyCollider(Collider collider)

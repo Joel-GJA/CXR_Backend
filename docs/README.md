@@ -19,6 +19,8 @@ This folder documents the multiplayer foundation and the developer-facing bluepr
 - [Runtime Facade and Debug GUI Blueprint](RuntimeFacade_DebugGUI_Blueprint.md): production UI API and debug GUI usage.
 - [Runtime Participant Blueprint](RuntimeParticipant_Blueprint.md): participant prefab structure, anchors, registration flow, local/remote separation, root body sync, and customization rules.
 - [Runtime Entity Blueprint](RuntimeEntity_Blueprint.md): networked object lifecycle, ownership, spawn/despawn, and registry rules.
+- [XR Interactable Sync Blueprint](XR_Interactable_Sync_Blueprint.md): networked XR grab/release flow, server physics handoff, stabilization behavior, and setup guidance for different object shapes.
+- [XR Interactable Physics Fix Report](XR_Interactable_Physics_Fix_Report.md): explanation of the original interactable physics issue, root cause, implemented fixes, and future prefab rules.
 - [Discovery and Session Blueprint](Discovery_Session_Blueprint.md): room discovery, metadata, runtime session state, and join flow.
 - [Headless Server Testing](Headless_Server_Testing.md): dedicated server launcher, command-line arguments, metadata, and validation workflow.
 - [Remote Room Registry](Remote_Room_Registry.md): multi-room hosting model for one physical Ubuntu server using a central HTTP registry.
