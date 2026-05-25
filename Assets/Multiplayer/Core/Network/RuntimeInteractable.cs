@@ -125,14 +125,23 @@ public class RuntimeInteractable : RuntimeEntity
         Debug.Log(
             $"[OWNERSHIP] Authority Assigned | " +
             $"InteractableNetID={netId} | " +
-            $"HolderNetID={holdingPlayerNetId}");
+            $"HolderNetID={holdingPlayerNetId}" +
+            $" | isServer={isServer} | isClient={isClient}");
     }
 
     [Command(requiresAuthority = true)]
     public void CmdRequestRelease()
     {
         if (interactableState != InteractableState.Grabbed)
+        {
+            Debug.LogWarning(
+                $"[INTERACTION] Release rejected | " +
+                $"state={interactableState} | " +
+                $"NetID={netId}");
             return;
+        }
+
+        uint releasedBy = holdingPlayerNetId;
 
         interactableState = InteractableState.Releasing;
 
@@ -143,7 +152,8 @@ public class RuntimeInteractable : RuntimeEntity
 
         Debug.Log(
             $"[OWNERSHIP] Authority Released | " +
-            $"InteractableNetID={netId}");
+            $"InteractableNetID={netId} | " +
+            $"ReleasedBy={releasedBy}");
     }
 
     [Server]
@@ -198,6 +208,8 @@ public class RuntimeInteractable : RuntimeEntity
         Debug.Log(
             $"[INTERACTION] State Changed | " +
             $"NetID={netId} | " +
+            $"isGravity={rb != null && rb.useGravity} | " +
+            $"isKinematic={rb != null && rb.isKinematic} | " +
             $"{oldState} -> {newState}");
 
         if (rb == null)
@@ -205,19 +217,33 @@ public class RuntimeInteractable : RuntimeEntity
 
         if (newState == InteractableState.Grabbed)
         {
+            bool wasGravity = rb.useGravity;
+            bool wasKinematic = rb.isKinematic;
             if (disableGravityOnGrab)
                 rb.useGravity = false;
             if (setKinematicOnGrab)
                 rb.isKinematic = true;
             rb.velocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            Debug.Log(
+                $"[INTERACTION] Physics Applied G | " +
+                $"NetID={netId} | " +
+                $"gravity={wasGravity}->{rb.useGravity} | " +
+                $"kinematic={wasKinematic}->{rb.isKinematic}");
         }
         else if (newState == InteractableState.Idle)
         {
+            bool wasGravity = rb.useGravity;
+            bool wasKinematic = rb.isKinematic;
             if (disableGravityOnGrab)
                 rb.useGravity = true;
             if (setKinematicOnGrab)
                 rb.isKinematic = false;
+            Debug.Log(
+                $"[INTERACTION] Physics Applied I | " +
+                $"NetID={netId} | " +
+                $"gravity={wasGravity}->{rb.useGravity} | " +
+                $"kinematic={wasKinematic}->{rb.isKinematic}");
         }
     }
 

@@ -9,6 +9,12 @@ public class XRITMenuBinder : MonoBehaviour
     [SerializeField]
     private InputActionReference toggleAction;
 
+    private void Awake()
+    {
+        if (Application.isBatchMode)
+            enabled = false;
+    }
+
     private void OnEnable()
     {
         if (toggleAction == null)

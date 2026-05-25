@@ -78,7 +78,7 @@ MonoBehaviour:
   syncPosition: 1
   syncRotation: 1
   syncScale: 0
-  onlySyncOnChange: 1
+  onlySyncOnChange: 0
   compressRotation: 0
   interpolatePosition: 1
   interpolateRotation: 1
@@ -213,7 +213,7 @@ MonoBehaviour:
   followSpeed: 15
   holdOffset: {x: 0, y: 1.2, z: 2}
   disableGravityOnGrab: 1
-  setKinematicOnGrab: 0
+  setKinematicOnGrab: 1
 --- !u!114 &2800523695135875155
 MonoBehaviour:
   m_ObjectHideFlags: 0
