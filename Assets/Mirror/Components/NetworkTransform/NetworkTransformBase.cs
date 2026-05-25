@@ -481,8 +481,14 @@ namespace Mirror
 
             if (syncDirection == SyncDirection.ClientToServer)
             {
-                ResetState();
-                RpcResetState();
+                // PATCH: Disable ResetState + RpcResetState on authority change.
+                // Mirror issue #3877: these calls clear snapshot buffers on every
+                // authority transfer, causing transform flicker/desync with
+                // ClientToServer sync direction. The resets fight per-frame position
+                // updates from CmdUpdatePositionUnreliable during grab, and on release
+                // they lose the last known position for the server to continue from.
+                //ResetState();
+                //RpcResetState();
             }
         }
 

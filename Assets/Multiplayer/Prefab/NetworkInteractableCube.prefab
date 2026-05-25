@@ -72,9 +72,9 @@ MonoBehaviour:
   syncMethod: 0
   syncDirection: 1
   syncMode: 0
-  syncInterval: 0.05
+  syncInterval: 0.016
   target: {fileID: 5669621091103181470}
-  updateMethod: 0
+  updateMethod: 2
   syncPosition: 1
   syncRotation: 1
   syncScale: 0
@@ -89,9 +89,9 @@ MonoBehaviour:
   showOverlay: 0
   overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
   onlySyncOnChangeCorrectionMultiplier: 2
-  rotationSensitivity: 0.001
-  positionPrecision: 0.001
-  scalePrecision: 0.001
+  rotationSensitivity: 0.01
+  positionPrecision: 0.01
+  scalePrecision: 0.01
 --- !u!54 &7534164105395222059
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -116,9 +116,9 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
 --- !u!33 &620100000000000001
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -210,10 +210,13 @@ MonoBehaviour:
   isInitialized: 0
   logLifecycle: 1
   trackInRegistry: 1
-  followSpeed: 15
-  holdOffset: {x: 0, y: 1.2, z: 2}
   disableGravityOnGrab: 1
   setKinematicOnGrab: 1
+  maxReleaseDistanceFromHolder: 4
+  releaseDepenetrationPadding: 0.02
+  releaseDepenetrationIterations: 4
+  maxReleaseVelocity: 12
+  maxReleaseAngularVelocity: 25
 --- !u!114 &2800523695135875155
 MonoBehaviour:
   m_ObjectHideFlags: 0
