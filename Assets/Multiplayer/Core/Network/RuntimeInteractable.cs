@@ -36,6 +36,14 @@ public class RuntimeInteractable : RuntimeEntity
 
     private Rigidbody rb;
     private Collider objectCollider;
+    private double validateReleasedUntil = double.NegativeInfinity;
+
+    private const float PostReleaseValidationSeconds = 2f;
+    private const float GroundSnapDistance = 0.08f;
+    private const float GroundSnapMaxSpeed = 0.25f;
+    private const float StabilizationMaxSpeed = 1.5f;
+    private const float StabilizationMinPenetration = 0.005f;
+    private const float StabilizationMaxCorrectionPerStep = 0.02f;
 
     public InteractableState CurrentInteractableState => interactableState;
     public uint HoldingPlayerNetId => holdingPlayerNetId;
@@ -63,6 +71,18 @@ public class RuntimeInteractable : RuntimeEntity
         {
             LocalTryRelease(transform.position, Vector3.zero, Vector3.zero);
         }
+    }
+
+    [ServerCallback]
+    private void FixedUpdate()
+    {
+        if (interactableState != InteractableState.Idle ||
+            NetworkTime.time > validateReleasedUntil)
+        {
+            return;
+        }
+
+        StabilizeReleasedPose();
     }
 
     public void LocalTryGrab()
@@ -188,6 +208,7 @@ public class RuntimeInteractable : RuntimeEntity
         interactableState = InteractableState.Idle;
 
         ApplyServerReleasedPhysics(clampedVelocity, clampedAngularVelocity);
+        validateReleasedUntil = NetworkTime.time + PostReleaseValidationSeconds;
 
         // Teleport ALL clients to the server-verified release position via NTR.
         if (TryGetComponent(out NetworkTransformReliable ntr))
@@ -352,9 +373,14 @@ public class RuntimeInteractable : RuntimeEntity
             return;
 
         rb.useGravity = false;
+
+        if (!rb.isKinematic)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
         rb.isKinematic = true;
-        rb.velocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
     }
 
     [Server]
@@ -369,6 +395,47 @@ public class RuntimeInteractable : RuntimeEntity
 
         if (objectCollider == null)
             return position;
+
+        return ResolvePenetration(
+            position,
+            requestedRotation,
+            true);
+    }
+
+    [Server]
+    private void StabilizeReleasedPose()
+    {
+        if (rb == null || objectCollider == null)
+            return;
+
+        if (rb.velocity.magnitude > StabilizationMaxSpeed)
+            return;
+
+        Vector3 stablePosition = ResolvePenetration(
+            rb.position,
+            rb.rotation,
+            false,
+            StabilizationMinPenetration,
+            StabilizationMaxCorrectionPerStep);
+
+        if (stablePosition != rb.position)
+        {
+            rb.position = stablePosition;
+            Physics.SyncTransforms();
+        }
+
+        SnapToGroundIfSettled();
+    }
+
+    [Server]
+    private Vector3 ResolvePenetration(
+        Vector3 requestedPosition,
+        Quaternion requestedRotation,
+        bool includeDynamicRigidbodies,
+        float minPenetration = 0f,
+        float maxCorrectionPerStep = float.PositiveInfinity)
+    {
+        Vector3 position = requestedPosition;
 
         Bounds bounds = objectCollider.bounds;
         Vector3 localOffset = transform.InverseTransformPoint(bounds.center);
@@ -391,7 +458,8 @@ public class RuntimeInteractable : RuntimeEntity
                 if (overlap == null ||
                     overlap == objectCollider ||
                     overlap.transform.IsChildOf(transform) ||
-                    transform.IsChildOf(overlap.transform))
+                    transform.IsChildOf(overlap.transform) ||
+                    (!includeDynamicRigidbodies && IsDynamicRigidbodyCollider(overlap)))
                 {
                     continue;
                 }
@@ -406,7 +474,15 @@ public class RuntimeInteractable : RuntimeEntity
                     out Vector3 direction,
                     out float distance))
                 {
-                    position += direction * (distance + releaseDepenetrationPadding);
+                    if (distance <= minPenetration)
+                    {
+                        continue;
+                    }
+
+                    float correctionDistance = Mathf.Min(
+                        distance + releaseDepenetrationPadding,
+                        maxCorrectionPerStep);
+                    position += direction * correctionDistance;
                     resolvedAnyOverlap = true;
                 }
             }
@@ -416,6 +492,55 @@ public class RuntimeInteractable : RuntimeEntity
         }
 
         return position;
+    }
+
+    [Server]
+    private void SnapToGroundIfSettled()
+    {
+        if (rb == null ||
+            objectCollider == null ||
+            GroundSnapDistance <= 0f ||
+            rb.velocity.magnitude > GroundSnapMaxSpeed)
+        {
+            return;
+        }
+
+        Bounds bounds = objectCollider.bounds;
+        float rayDistance = bounds.extents.y + GroundSnapDistance;
+
+        if (!Physics.Raycast(
+            bounds.center,
+            Vector3.down,
+            out RaycastHit hit,
+            rayDistance,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Ignore))
+        {
+            return;
+        }
+
+        if (hit.collider == objectCollider ||
+            hit.collider.transform.IsChildOf(transform) ||
+            transform.IsChildOf(hit.collider.transform) ||
+            IsDynamicRigidbodyCollider(hit.collider))
+        {
+            return;
+        }
+
+        float desiredCenterY = hit.point.y + bounds.extents.y + releaseDepenetrationPadding;
+        float correction = desiredCenterY - bounds.center.y;
+
+        if (correction >= -0.001f || Mathf.Abs(correction) > GroundSnapDistance)
+            return;
+
+        rb.position += Vector3.up * correction;
+        Physics.SyncTransforms();
+    }
+
+    private bool IsDynamicRigidbodyCollider(Collider collider)
+    {
+        Rigidbody attachedRigidbody = collider.attachedRigidbody;
+        return attachedRigidbody != null && !attachedRigidbody.isKinematic;
     }
 
     [Server]

@@ -322,7 +322,7 @@ MonoBehaviour:
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
-  m_ThrowOnDetach: 1
+  m_ThrowOnDetach: 0
   m_ThrowSmoothingDuration: 0.25
   m_ThrowSmoothingCurve:
     serializedVersion: 2
@@ -766,7 +766,7 @@ MonoBehaviour:
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
-  m_ThrowOnDetach: 1
+  m_ThrowOnDetach: 0
   m_ThrowSmoothingDuration: 0.25
   m_ThrowSmoothingCurve:
     serializedVersion: 2
@@ -1012,6 +1012,14 @@ PrefabInstance:
     - target: {fileID: 3868890384741620830, guid: 4af9f22c0cd951a4f93c3ed791304242, type: 3}
       propertyPath: m_Name
       value: XR Interaction Setup
+      objectReference: {fileID: 0}
+    - target: {fileID: 4212829314582060752, guid: 4af9f22c0cd951a4f93c3ed791304242, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4212829314582060755, guid: 4af9f22c0cd951a4f93c3ed791304242, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7615279276577945024, guid: 4af9f22c0cd951a4f93c3ed791304242, type: 3}
       propertyPath: m_LocalPosition.x
