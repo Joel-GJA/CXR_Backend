@@ -16,14 +16,10 @@ public class WristMenuController : MonoBehaviour
 
     [SerializeField]
     private debugPanelController debugPanel;
+
     private void Awake()
     {
-        if (runtimeFacade == null)
-            runtimeFacade = FindObjectOfType<XRMultiplayerRuntimeFacade>();
-
-        connectionPanel.Initialize(runtimeFacade);
-        registryPanel.Initialize(runtimeFacade);
-        roomsPanel.Initialize(runtimeFacade);
+        InitializePanels();
     }
     private void HideAll()
     {
@@ -60,8 +56,28 @@ public class WristMenuController : MonoBehaviour
     public void SetRuntimeFacade(XRMultiplayerRuntimeFacade facade)
     {
         runtimeFacade = facade;
-        connectionPanel.Initialize(facade);
-        registryPanel.Initialize(facade);
-        roomsPanel.Initialize(facade);
+        InitializePanels();
+    }
+
+    private void InitializePanels()
+    {
+        if (runtimeFacade == null)
+        {
+            Debug.LogWarning(
+                "[WRIST MENU] Runtime facade is not assigned. " +
+                "Inject it through WristMenuController.SetRuntimeFacade.");
+        }
+
+        if (connectionPanel != null)
+            connectionPanel.Initialize(runtimeFacade);
+
+        if (registryPanel != null)
+            registryPanel.Initialize(runtimeFacade);
+
+        if (roomsPanel != null)
+            roomsPanel.Initialize(runtimeFacade);
+
+        if (debugPanel != null)
+            debugPanel.Initialize(runtimeFacade);
     }
 }

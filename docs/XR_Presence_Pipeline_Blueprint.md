@@ -13,6 +13,8 @@ Scripts:
 - `Assets/Multiplayer/Core/Runtime/XRTrackingBridge.cs`
 - `Assets/Multiplayer/Core/Runtime/XRRuntimeParticipant.cs`
 - `Assets/Multiplayer/Core/Runtime/XRParticipantRuntime.cs`
+- `Assets/Multiplayer/Core/Runtime/XRHandPhysicsContactProxy.cs`
+- `Assets/Multiplayer/Core/Runtime/XRBodyPhysicsContactProxy.cs`
 - `Assets/Multiplayer/Core/Runtime/RuntimeParticipant.cs`
 
 ---
@@ -41,6 +43,25 @@ Remote clients: server → `NetworkTransform` → proxy sphere position updates.
 
 ## Architecture Overview
 
+### Server Contact Proxies
+
+`XRParticipantRuntime` now creates lightweight server-only contact proxies for left hand, right hand, and body.
+
+These proxies are:
+
+- invisible
+- kinematic trigger volumes
+- driven from replicated hand transforms
+- used only for authoritative passive contact with dynamic objects
+
+The hand proxies use sphere triggers. The body proxy uses a capsule trigger.
+
+The body proxy uses a capsule shape driven from the participant root so locomotion can nudge idle objects without turning the avatar into a fully simulated character body.
+
+They are not visual hands, not ownership objects, and not full avatar physics bodies.
+
+Remote participants currently receive stronger passive-contact multipliers than host participants to better match real-world feel across the networked path.
+
 ### XRTrackingBridge
 
 `XRTrackingBridge` is the bridge between the local XR rig (XR Origin) and the networked player prefab. It runs at `DefaultExecutionOrder(-100)` to execute before other `LateUpdate` callers.
@@ -52,6 +73,7 @@ Responsibilities:
 - Writes transforms to `XRParticipantRuntime.HeadTransform`, `.LeftHandTransform`, `.RightHandTransform`.
 - Syncs root body position (head Y - bodyHeightOffset) + yaw-only rotation.
 - Provides keyboard fallback mode (press T) for debug/testing without XR hardware.
+- Resolves both `Camera Offset` and `CameraOffset` XR rig naming when entering keyboard fallback mode.
 
 ### Local vs Remote Separation
 
@@ -151,6 +173,12 @@ Press **T** to toggle between XR device tracking and keyboard/mouse control.
 
 Useful for testing sync without XR hardware. Logged as `[XR_PRESENCE] TrackingBridge mode: Keyboard/XR`.
 
+Keyboard fallback notes:
+
+- the bridge restores the XR rig camera offset to headset-height while fallback is active
+- body sync still derives from the head transform, so incorrect camera offset resolution will make the synced body appear too low
+- server body contact proxies now run overlap checks as well as trigger callbacks to make keyboard pushing more reliable
+
 ---
 
 ## Spawn Lifecycle
@@ -160,6 +188,8 @@ Useful for testing sync without XR hardware. Logged as `[XR_PRESENCE] TrackingBr
 3. `XRParticipantRuntime.OnStartLocalPlayer()` configures local rig (proxies hidden).
 4. `XRParticipantRuntime.OnStartClient()` (remote) configures remote rig (proxies shown).
 5. `XRTrackingBridge.FindLocalRig()` finds the local player's `XRParticipantRuntime` and begins syncing.
+6. `XRParticipantRuntime.OnStartServer()` creates left/right server hand contact proxies and one body capsule contact proxy for passive pushing.
+7. In keyboard fallback mode, `XRTrackingBridge` still drives head/root sync so the same passive contact pipeline can be tested without a headset.
 
 ### Disconnect Cleanup
 
@@ -218,9 +248,11 @@ A combined XR presence validation scene containing:
 - Do NOT place `XRRuntimeParticipant` or `XRParticipantRuntime` directly in the scene — they exist only on the networked prefab.
 - Change `bodyHeightOffset` on `XRTrackingBridge` if your app uses a different eye-to-body offset.
 - Use keyboard fallback (T) for sync testing without XR hardware.
+- If the keyboard fallback body appears too low, inspect the XR rig camera offset naming first.
 - Keep proxy spheres simple — they are not final avatars, just visual indicators.
 - Root body sync drives the Capsule under `AvatarVisualRoot` — swap the Capsule for an app-specific body mesh.
 - Register custom spawn prefabs in `XRNetworkManager.runtimeSpawnPrefabs`.
+- Passive push contact lives in server-only proxies, not in the visual proxy spheres or avatar mesh.
 - If using a different XR Origin variant, rename it to `"XR Origin (XR Rig)"` for auto-wire to work, or manually assign references in the Inspector.
 
 ---

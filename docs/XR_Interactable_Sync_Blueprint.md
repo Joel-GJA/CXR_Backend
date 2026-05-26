@@ -8,20 +8,48 @@ Key files:
 
 - `Assets/Multiplayer/Core/Network/RuntimeInteractable.cs`
 - `Assets/Multiplayer/XR/XRInteractableBridge.cs`
+- `Assets/Multiplayer/Core/Runtime/XRHandPhysicsContactProxy.cs`
+- `Assets/Multiplayer/Core/Runtime/XRBodyPhysicsContactProxy.cs`
+- `Assets/Multiplayer/Core/Runtime/XRParticipantRuntime.cs`
 - `Assets/Multiplayer/Prefab/NetworkInteractableCube.prefab`
 - `Assets/Multiplayer/Scenes/XRPresenceTestScene.unity`
 
 ## Current Interaction Flow
 
 1. `XRGrabInteractable` detects grab/release through XR Interaction Toolkit.
-2. `XRInteractableBridge` forwards grab/release intent to `RuntimeInteractable`.
+2. `XRInteractableBridge` forwards grab/release intent to `RuntimeInteractable` and blocks invalid local grabs.
 3. `RuntimeInteractable.CmdRequestGrab` asks the server for temporary client authority.
 4. While grabbed, the grabbing client drives the object transform through Mirror `NetworkTransformReliable`.
 5. On release, the client sends final position, final rotation, linear velocity, and angular velocity.
 6. The server validates the release pose, restores server physics, applies velocity, and broadcasts the accepted pose.
 7. Non-owning clients keep the Rigidbody kinematic and render server-synchronized transforms.
+8. Passive hand/body contact is handled separately by server-side contact proxies and does not transfer freeform object ownership.
 
 This keeps grabbing responsive while making released-object physics server-authoritative.
+
+## Passive Contact Physics
+
+Idle object pushing is now supported through server-side hand and body contact proxies.
+
+How it works:
+
+1. XR head and hand transforms still replicate through the XR presence pipeline.
+2. On the server, each participant creates lightweight left/right hand contact proxies plus one body capsule contact proxy.
+3. Each contact proxy follows the replicated tracked transform in `FixedUpdate`.
+4. When a proxy overlaps a dynamic Rigidbody, it applies a small authoritative velocity change at the contact point.
+5. Grabbed interactables are excluded so passive pushing does not fight active ownership transfer.
+
+This keeps passive contact available for remote Quest clients without giving every client freeform authority over idle objects.
+
+The body proxy is tuned to push more softly than the hands and only transfers horizontal motion, which is a better fit for locomotion-driven contact in simulation scenes.
+
+Current implementation details:
+
+- hand contact uses lightweight sphere trigger proxies
+- body contact uses a capsule trigger proxy following the participant root
+- host participants use baseline push strength
+- remote participants use stronger push multipliers to compensate for networked feel
+- keyboard fallback body contact also uses proactive overlap checks, not just trigger callbacks
 
 ## Implemented Changes
 
@@ -57,6 +85,23 @@ For a short period after release, the server performs a conservative correction 
 - keeps a small ground snap for static/kinematic surfaces only
 
 This preserves clean ground landings without fighting cube-on-cube stacking.
+
+### XR Ownership Gating
+
+`XRGrabInteractable` selection is now gated against network ownership state.
+
+If another player is already holding an object:
+
+- the local XR interactor should not latch onto it
+- any race-condition local selection is canceled if authority does not arrive
+
+This prevents VR-only "ghost grabs" where a remote client appears to move an object locally that is still owned somewhere else on the server.
+
+### Remote Contact Compensation
+
+Remote passive contact uses stronger push multipliers than the host path.
+
+This is deliberate. The host already benefits from direct access to authoritative physics, while remote clients are pushing through replicated pose data. The multiplier narrows that feel gap without changing the grab authority model.
 
 ### Compound Collider Support
 
@@ -102,6 +147,10 @@ Recommended XR Grab Interactable settings:
 - `Track Position`: enabled
 - `Track Rotation`: enabled
 - `Throw On Detach`: disabled
+
+Passive hand pushing does not require any extra per-object component beyond a normal dynamic Rigidbody and usable colliders.
+
+Passive body pushing also works with the same requirement, but objects should remain dynamic while idle. Kinematic idle objects will not be nudged by the contact proxies.
 
 ## Collider Guidance By Shape
 
@@ -169,6 +218,14 @@ Caps throw speed. Raise for fast objects, lower for heavy props.
 
 Caps spin speed. Raise for objects designed to spin, lower for props that should settle calmly.
 
+Internal contact-proxy tuning currently lives in:
+
+- `XRHandPhysicsContactProxy`
+- `XRBodyPhysicsContactProxy`
+- `XRParticipantRuntime`
+
+Those are code-level tuning points rather than per-prefab Inspector fields.
+
 ## Future Object Checklist
 
 When creating a new networked interactable:
@@ -179,8 +236,10 @@ When creating a new networked interactable:
 4. Use primitive or convex colliders that match the intended physical shape.
 5. Register the prefab in `XRNetworkManager.runtimeSpawnPrefabs` if it is spawned dynamically.
 6. Test host and client release from different heights.
-7. Test stacking on static surfaces and on another dynamic object.
-8. Tune release velocity caps only if the object feels too weak or too explosive.
+7. Test host and client passive hand pushing.
+8. Test remote body pushing and keyboard fallback body pushing.
+9. Test stacking on static surfaces and on another dynamic object.
+10. Tune release velocity caps only if the object feels too weak or too explosive.
 
 ## Debugging Tips
 
@@ -210,3 +269,17 @@ If grabbing feels delayed:
 - verify the object receives client authority on grab
 - verify `NetworkTransformReliable` is `ClientToServer`
 - keep `syncInterval` low enough for held-object responsiveness
+
+If remote clients cannot push objects:
+
+- verify the participant prefab includes `XRParticipantRuntime`
+- verify the server is creating hand contact proxies
+- verify the server is creating the body contact proxy
+- verify the target object uses a non-kinematic Rigidbody while idle
+- verify the object is not currently grabbed by another player
+
+If keyboard fallback body pushing passes through:
+
+- verify `XRTrackingBridge` resolves the XR rig's camera offset correctly
+- verify the fallback camera height is correct after pressing `T`
+- verify the body proxy overlaps the object at the expected chest/torso height
