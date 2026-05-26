@@ -82,7 +82,7 @@ public class XRTrackingBridge : MonoBehaviour
             xrCamera = headSource.GetComponent<Camera>();
 
         if (xrOrigin != null)
-            cameraOffset = xrOrigin.Find("CameraOffset");
+            cameraOffset = ResolveCameraOffset(xrOrigin);
 
         Camera fallback = Camera.main;
         if (fallback != null && fallback != xrCamera)
@@ -121,6 +121,29 @@ public class XRTrackingBridge : MonoBehaviour
     {
         Camera cam = origin.GetComponentInChildren<Camera>();
         return cam != null ? cam.transform : origin.Find("Camera Offset/Main Camera");
+    }
+
+    private static Transform ResolveCameraOffset(Transform origin)
+    {
+        Transform offset = origin.Find("Camera Offset");
+        if (offset != null)
+            return offset;
+
+        offset = origin.Find("CameraOffset");
+        if (offset != null)
+            return offset;
+
+        for (int index = 0; index < origin.childCount; index++)
+        {
+            Transform child = origin.GetChild(index);
+            string normalizedName =
+                child.name.Replace(" ", "").ToLowerInvariant();
+
+            if (normalizedName.Contains("cameraoffset"))
+                return child;
+        }
+
+        return null;
     }
 
     private static void ResolveControllers(Transform origin, out Transform left, out Transform right)

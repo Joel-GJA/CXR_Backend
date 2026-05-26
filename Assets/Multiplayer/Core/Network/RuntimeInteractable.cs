@@ -23,6 +23,9 @@ public class RuntimeInteractable : RuntimeEntity
     private float maxReleaseDistanceFromHolder = 4f;
 
     [SerializeField]
+    private float maxReleaseDistanceFromCurrentPose = 1.25f;
+
+    [SerializeField]
     private float releaseDepenetrationPadding = 0.02f;
 
     [SerializeField]
@@ -33,6 +36,12 @@ public class RuntimeInteractable : RuntimeEntity
 
     [SerializeField]
     private float maxReleaseAngularVelocity = 25f;
+
+    [SerializeField]
+    private float nearSupportReleaseDistance = 0.15f;
+
+    [SerializeField]
+    private float maxDownwardReleaseSpeedNearSupport = 1.5f;
 
     private Rigidbody rb;
     private Collider[] objectColliders;
@@ -49,6 +58,7 @@ public class RuntimeInteractable : RuntimeEntity
     public InteractableState CurrentInteractableState => interactableState;
     public uint HoldingPlayerNetId => holdingPlayerNetId;
     public bool IsGrabbed => interactableState == InteractableState.Grabbed;
+    public bool IsHeldByAnotherClient => IsGrabbed && !isOwned;
 
     public event System.Action<InteractableState, InteractableState> InteractableStateChanged;
 
@@ -92,12 +102,13 @@ public class RuntimeInteractable : RuntimeEntity
         StabilizeReleasedPose();
     }
 
-    public void LocalTryGrab()
+    public bool LocalTryGrab()
     {
-        if (!isClient || IsGrabbed)
-            return;
+        if (!isClient || IsHeldByAnotherClient)
+            return false;
 
         CmdRequestGrab();
+        return true;
     }
 
     public void LocalTryRelease()
@@ -164,6 +175,13 @@ public class RuntimeInteractable : RuntimeEntity
             $"InteractableNetID={netId} | " +
             $"HolderNetID={holdingPlayerNetId}" +
             $" | isServer={isServer} | isClient={isClient}");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.OwnershipAcquired,
+            nameof(RuntimeInteractable),
+            "Interactable authority assigned.",
+            holdingPlayerNetId,
+            netId);
     }
 
     [Command(requiresAuthority = true)]
@@ -193,6 +211,11 @@ public class RuntimeInteractable : RuntimeEntity
         Vector3 clampedAngularVelocity = Vector3.ClampMagnitude(
             angularVelocity,
             maxReleaseAngularVelocity);
+
+        clampedVelocity = ClampReleaseVelocityNearSupport(
+            validatedPosition,
+            finalRotation,
+            clampedVelocity);
 
         if (rb != null)
         {
@@ -234,6 +257,13 @@ public class RuntimeInteractable : RuntimeEntity
             $"validatedPos={validatedPosition} | " +
             $"vel={clampedVelocity} | " +
             $"angVel={clampedAngularVelocity}");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.OwnershipReleased,
+            nameof(RuntimeInteractable),
+            "Interactable authority released.",
+            releasedBy,
+            netId);
     }
 
     [Server]
@@ -252,6 +282,12 @@ public class RuntimeInteractable : RuntimeEntity
         Debug.Log(
             $"[OWNERSHIP] Force Released | " +
             $"InteractableNetID={netId}");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.OwnershipReleased,
+            nameof(RuntimeInteractable),
+            "Interactable authority force released.",
+            entityNetId: netId);
     }
 
     public override void OnStartAuthority()
@@ -396,9 +432,16 @@ public class RuntimeInteractable : RuntimeEntity
         Quaternion requestedRotation,
         uint releasedBy)
     {
-        Vector3 position = ClampReleaseDistanceFromHolder(
-            requestedPosition,
+        Vector3 position = ClampReleaseDistanceFromCurrentPose(
+            requestedPosition);
+        position = ClampReleaseDistanceFromHolder(
+            position,
             releasedBy);
+
+        if (position != requestedPosition)
+        {
+            position = ClampReleaseDistanceFromCurrentPose(position);
+        }
 
         if (!HasUsableColliders())
             return position;
@@ -649,6 +692,48 @@ public class RuntimeInteractable : RuntimeEntity
     }
 
     [Server]
+    private Vector3 ClampReleaseVelocityNearSupport(
+        Vector3 releasePosition,
+        Quaternion releaseRotation,
+        Vector3 velocity)
+    {
+        if (maxDownwardReleaseSpeedNearSupport <= 0f ||
+            nearSupportReleaseDistance <= 0f ||
+            velocity.y >= -maxDownwardReleaseSpeedNearSupport ||
+            !TryGetCombinedColliderBoundsAtPose(
+                releasePosition,
+                releaseRotation,
+                out Bounds bounds))
+        {
+            return velocity;
+        }
+
+        float rayDistance = bounds.extents.y + nearSupportReleaseDistance;
+
+        if (!Physics.Raycast(
+                bounds.center,
+                Vector3.down,
+                out RaycastHit hit,
+                rayDistance,
+                Physics.AllLayers,
+                QueryTriggerInteraction.Ignore))
+        {
+            return velocity;
+        }
+
+        if (IsOwnCollider(hit.collider))
+        {
+            return velocity;
+        }
+
+        velocity.y = Mathf.Max(
+            velocity.y,
+            -maxDownwardReleaseSpeedNearSupport);
+
+        return velocity;
+    }
+
+    [Server]
     private Vector3 ClampReleaseDistanceFromHolder(
         Vector3 requestedPosition,
         uint releasedBy)
@@ -664,11 +749,81 @@ public class RuntimeInteractable : RuntimeEntity
 
         Vector3 holderPosition = holderIdentity.transform.position;
         Vector3 holderToRelease = requestedPosition - holderPosition;
+        float currentHolderDistance = Vector3.Distance(
+            holderPosition,
+            GetCurrentPhysicsPosition());
+        float allowedDistance = Mathf.Max(
+            maxReleaseDistanceFromHolder,
+            currentHolderDistance + maxReleaseDistanceFromCurrentPose);
 
-        if (holderToRelease.magnitude <= maxReleaseDistanceFromHolder)
+        if (holderToRelease.magnitude <= allowedDistance)
             return requestedPosition;
 
         return holderPosition +
-            holderToRelease.normalized * maxReleaseDistanceFromHolder;
+            holderToRelease.normalized * allowedDistance;
+    }
+
+    [Server]
+    private Vector3 ClampReleaseDistanceFromCurrentPose(
+        Vector3 requestedPosition)
+    {
+        if (maxReleaseDistanceFromCurrentPose <= 0f)
+            return requestedPosition;
+
+        Vector3 currentPosition = GetCurrentPhysicsPosition();
+        Vector3 delta = requestedPosition - currentPosition;
+
+        if (delta.sqrMagnitude <=
+            maxReleaseDistanceFromCurrentPose * maxReleaseDistanceFromCurrentPose)
+        {
+            return requestedPosition;
+        }
+
+        return currentPosition +
+            delta.normalized * maxReleaseDistanceFromCurrentPose;
+    }
+
+    private Vector3 GetCurrentPhysicsPosition()
+    {
+        return rb != null ? rb.position : transform.position;
+    }
+
+    private bool TryGetCombinedColliderBoundsAtPose(
+        Vector3 rootPosition,
+        Quaternion rootRotation,
+        out Bounds combinedBounds)
+    {
+        combinedBounds = default;
+        bool hasBounds = false;
+
+        foreach (Collider collider in objectColliders)
+        {
+            if (!IsUsableOwnCollider(collider))
+                continue;
+
+            GetColliderPose(
+                collider,
+                rootPosition,
+                rootRotation,
+                out Vector3 colliderPosition,
+                out _);
+
+            Bounds bounds = collider.bounds;
+            Vector3 offset = colliderPosition - bounds.center;
+            bounds.center += offset;
+
+            if (!hasBounds)
+            {
+                combinedBounds = bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(bounds.min);
+                combinedBounds.Encapsulate(bounds.max);
+            }
+        }
+
+        return hasBounds;
     }
 }

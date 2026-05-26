@@ -68,6 +68,11 @@ public class RuntimeSessionManager : MonoBehaviour
         TransitionTo(RuntimeSessionState.WaitingForParticipants);
 
         Debug.Log("[SESSION] Server Session Ready");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.SessionStarted,
+            nameof(RuntimeSessionManager),
+            "Server session ready.");
     }
 
     [Server]
@@ -85,6 +90,11 @@ public class RuntimeSessionManager : MonoBehaviour
         participantNetIdsByConnectionId.Clear();
 
         Debug.Log("[SESSION] Server Session Shutdown");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.SessionEnded,
+            nameof(RuntimeSessionManager),
+            "Server session shutdown.");
     }
 
     [Server]
@@ -120,6 +130,12 @@ public class RuntimeSessionManager : MonoBehaviour
 
         ParticipantRegistered?.Invoke(participant);
 
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.PlayerJoined,
+            nameof(RuntimeSessionManager),
+            "Participant registered.",
+            participantNetId);
+
         TransitionTo(RuntimeSessionState.Active);
 
         return true;
@@ -147,6 +163,13 @@ public class RuntimeSessionManager : MonoBehaviour
             $"Participants={ParticipantCount}");
 
         ParticipantUnregistered?.Invoke(participant);
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.PlayerLeft,
+            nameof(RuntimeSessionManager),
+            "Participant unregistered.",
+            participantNetId);
+
         HandleEmptySession();
 
         return true;
