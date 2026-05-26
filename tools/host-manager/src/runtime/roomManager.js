@@ -403,10 +403,6 @@ function validateConfig(config) {
     }
   }
 
-  if (!config.builds || Object.keys(config.builds).length === 0) {
-    throw new Error("At least one Unity build must be discovered in unity-builds/ or configured via CXR_UNITY_EXECUTABLE_PATH.");
-  }
-
   if (
     !config.roomPortRange ||
     typeof config.roomPortRange.start !== "number" ||

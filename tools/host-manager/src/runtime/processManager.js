@@ -113,9 +113,9 @@ class ProcessManager extends EventEmitter {
   }
 
   _spawn(service) {
-    const env = { ...process.env };
+    const env = normalizeSpawnEnvironment(process.env);
     for (const [key, value] of Object.entries(service.env)) {
-      env[key] = value;
+      assignEnvValue(env, key, value);
     }
     const childProcess = spawn(service.executable, service.args, {
       cwd: service.cwd,
@@ -328,6 +328,27 @@ class ProcessManager extends EventEmitter {
       }
     }
   }
+}
+
+function normalizeSpawnEnvironment(source) {
+  const env = {};
+
+  for (const [key, value] of Object.entries(source || {})) {
+    assignEnvValue(env, key, value);
+  }
+
+  return env;
+}
+
+function assignEnvValue(target, key, value) {
+  if (process.platform !== "win32") {
+    target[key] = value;
+    return;
+  }
+
+  const existingKey = Object.keys(target).find(existing => existing.toLowerCase() === key.toLowerCase());
+  const normalizedKey = existingKey || key;
+  target[normalizedKey] = value;
 }
 
 module.exports = ProcessManager;
