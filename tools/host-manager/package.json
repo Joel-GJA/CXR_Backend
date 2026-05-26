@@ -1,0 +1,13 @@
+{
+  "name": "cxr-host-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin-operated room orchestrator for Ubuntu-hosted Unity headless room processes.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
