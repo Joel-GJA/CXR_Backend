@@ -132,7 +132,39 @@ public sealed class XRMultiplayerRuntimeFacade : MonoBehaviour
     {
         connectionStateProvider = new XRConnectionStateProvider();
         TryResolveNetworkManager();
+        TryResolveDiscoveryLifecycle();
+        TryResolveRemoteRegistryBrowser();
         SyncRoomBrowser();
+    }
+
+    private void TryResolveDiscoveryLifecycle()
+    {
+        if (discoveryLifecycle != null)
+            return;
+
+        discoveryLifecycle = GetComponent<XRRoomDiscoveryLifecycle>() ??
+                             FindObjectOfType<XRRoomDiscoveryLifecycle>();
+
+        if (discoveryLifecycle == null)
+        {
+            discoveryLifecycle = gameObject.AddComponent<XRRoomDiscoveryLifecycle>();
+            Debug.Log("[FACADE] Auto-created XRRoomDiscoveryLifecycle");
+        }
+    }
+
+    private void TryResolveRemoteRegistryBrowser()
+    {
+        if (remoteRoomRegistryBrowser != null)
+            return;
+
+        remoteRoomRegistryBrowser = GetComponent<RemoteRoomRegistryBrowser>() ??
+                                     FindObjectOfType<RemoteRoomRegistryBrowser>();
+
+        if (remoteRoomRegistryBrowser == null)
+        {
+            remoteRoomRegistryBrowser = gameObject.AddComponent<RemoteRoomRegistryBrowser>();
+            Debug.Log("[FACADE] Auto-created RemoteRoomRegistryBrowser");
+        }
     }
 
     private void TryResolveNetworkManager()

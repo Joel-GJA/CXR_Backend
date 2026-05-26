@@ -31,15 +31,6 @@ public class RegistryPanelController : RuntimeFacadePanel
     [SerializeField]
     private Button advertiseButton;
 
-    private void Awake()
-    {
-        if (runtimeFacade == null)
-        {
-            runtimeFacade =
-                FindFirstObjectByType<XRMultiplayerRuntimeFacade>();
-        }
-    }
-
     private void Start()
     {
         applyButton.onClick.AddListener(OnApplyClicked);

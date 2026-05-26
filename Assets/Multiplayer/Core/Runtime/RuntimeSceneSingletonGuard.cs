@@ -20,6 +20,9 @@ public sealed class RuntimeSceneSingletonGuard : MonoBehaviour
 
     private void OnEnable()
     {
+        if (Application.isBatchMode)
+            return;
+
         SceneManager.sceneLoaded += HandleSceneLoaded;
         EnforceSingletons();
     }
@@ -41,6 +44,9 @@ public sealed class RuntimeSceneSingletonGuard : MonoBehaviour
 
     private void EnforceSingletons()
     {
+        if (Application.isBatchMode)
+            return;
+
         if (enforceEventSystem)
         {
             EnforceEventSystem();

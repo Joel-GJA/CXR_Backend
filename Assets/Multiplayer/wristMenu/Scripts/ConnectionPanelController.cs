@@ -31,15 +31,6 @@ public class ConnectionPanelController : RuntimeFacadePanel
         stopButton.onClick.AddListener(OnStopClicked);
     }
     
-    private void Awake()
-    {
-        if (runtimeFacade == null)
-        {
-            runtimeFacade =
-                FindFirstObjectByType<XRMultiplayerRuntimeFacade>();
-        }
-    }
-
     public override void Initialize(XRMultiplayerRuntimeFacade facade)
     {
         runtimeFacade = facade;
