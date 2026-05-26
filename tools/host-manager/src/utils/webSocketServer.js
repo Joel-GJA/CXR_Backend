@@ -61,6 +61,21 @@ class LogWebSocketServer {
     }
   }
 
+  broadcastBuilds(builds, diff) {
+    const message = JSON.stringify({ type: "builds", builds, added: diff.added, removed: diff.removed, timestamp: new Date().toISOString() });
+    for (const client of this.clients) {
+      if (client.ws.readyState !== 1) {
+        this.clients.delete(client);
+        continue;
+      }
+      try {
+        client.ws.send(message);
+      } catch (e) {
+        this.clients.delete(client);
+      }
+    }
+  }
+
   broadcastStatus(status) {
     const message = JSON.stringify({ type: "status", ...status, timestamp: new Date().toISOString() });
     for (const client of this.clients) {

@@ -60,6 +60,21 @@ class RoomManager {
     return this.builds;
   }
 
+  refreshBuilds(newBuilds) {
+    const oldIds = this.buildIds;
+    const newIds = Object.keys(newBuilds);
+    const added = newIds.filter(id => !oldIds.includes(id));
+    const removed = oldIds.filter(id => !newIds.includes(id));
+    this.builds = newBuilds;
+    this.buildIds = newIds;
+    if (!this.buildIds.includes(this.defaultBuildId)) {
+      this.defaultBuildId = this.buildIds.includes("default")
+        ? "default"
+        : this.buildIds[0] || null;
+    }
+    return { added, removed };
+  }
+
   findBuild(buildId) {
     if (buildId && this.builds[buildId]) {
       return this.builds[buildId];

@@ -16,7 +16,8 @@ const {
 const {
   getAvailableIPv4Addresses,
   isAuthorizedRequest,
-  loadHostManagerConfig
+  loadHostManagerConfig,
+  watchBuilds
 } = require("../shared/runtimeConfig");
 
 const configPath = path.join(__dirname, "config", "default.json");
@@ -57,6 +58,18 @@ processManager.on("log", (entry) => {
 
 processManager.on("status", (status) => {
   logWsServer.broadcastStatus(status);
+});
+
+watchBuilds(path.dirname(configPath), (newBuilds, oldBuilds, diff) => {
+  const result = roomManager.refreshBuilds(newBuilds);
+  logWsServer.broadcastBuilds(newBuilds, result);
+  roomManager.log("info", `Builds updated: +${result.added.length} -${result.removed.length}`);
+  for (const id of result.added) {
+    roomManager.log("info", `Build added: "${newBuilds[id].name}" (${id})`);
+  }
+  for (const id of result.removed) {
+    roomManager.log("info", `Build removed: "${oldBuilds[id].name}" (${id})`);
+  }
 });
 
 function gracefulShutdownHostManager() {

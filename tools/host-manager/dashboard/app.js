@@ -185,6 +185,7 @@ async function refreshRooms() {
   reconcileCollapsedBuilds();
   renderRooms();
   renderConnectionHints();
+  renderConnectionPanel();
 }
 
 async function refreshHostLog() {
@@ -458,6 +459,31 @@ function renderConnectionHints() {
   availableAddresses.textContent = (hints.availableAddresses || []).join(", ");
   networkWarning.textContent = hints.warning || "None";
   networkWarningRow.style.display = hints.warning ? "grid" : "none";
+}
+
+function renderConnectionPanel() {
+  const hints = state.connectionHints;
+  if (!hints) return;
+  document.getElementById("panelRegistryUrl").textContent = hints.xrMultiplayerDebugGui?.remoteRegistryUrl || "—";
+  document.getElementById("panelHostManagerUrl").textContent = hints.hostManagerUrl || "—";
+
+  const runningRooms = (state.rooms || []).filter(r => r.status === "running");
+  const roomCount = document.getElementById("panelRoomCount");
+  const roomList = document.getElementById("panelRoomList");
+
+  roomCount.textContent = `${runningRooms.length} ${runningRooms.length === 1 ? "room" : "rooms"}`;
+
+  if (runningRooms.length === 0) {
+    roomList.innerHTML = `<div class="hint-row"><span>No rooms running</span><code>—</code></div>`;
+    return;
+  }
+
+  roomList.innerHTML = runningRooms.map(room => `
+    <div class="hint-row">
+      <span>${escapeHtml(room.requestedName)}</span>
+      <code class="select-all">${escapeHtml(room.ip)}:${room.port}</code>
+    </div>
+  `).join("");
 }
 
 function renderRegistryState() {
@@ -982,6 +1008,13 @@ function setupWsHandlers() {
           logTerminal.textContent = state.logLines.join("\n");
           logTerminal.scrollTop = logTerminal.scrollHeight;
         }
+      } else if (msg.type === "builds") {
+        state.builds = msg.builds;
+        populateBuildSelect();
+        reconcileCollapsedBuilds();
+        renderRooms();
+        renderRoomMonitors();
+        renderConnectionHints();
       } else if (msg.type === "connected" && logConnectionStatus) {
         logConnectionStatus.textContent = "Connected to log stream";
       }

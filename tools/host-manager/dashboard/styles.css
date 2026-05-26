@@ -401,6 +401,11 @@ button.danger {
   color: #ffd28a;
 }
 
+.select-all {
+  user-select: all;
+  -webkit-user-select: all;
+}
+
 .terminal {
   min-height: 420px;
   max-height: 62vh;
