@@ -1,0 +1,31 @@
+{
+  "hostManagerPort": 3000,
+  "publicAddress": "auto",
+  "roomPortRange": {
+    "start": 7777,
+    "end": 7900
+  },
+  "registryUrl": "http://127.0.0.1:8080",
+  "logsDirectory": "../logs",
+  "templates": {
+    "room-registry": {
+      "executable": "node",
+      "args": ["server.js"],
+      "cwd": "../../room-registry",
+      "env": {
+        "CXR_REGISTRY_PORT": "8080",
+        "CXR_REGISTRY_STALE_MS": "90000"
+      },
+      "description": "Room registry service"
+    },
+    "unity-room": {
+      "description": "Unity headless room process (resolved dynamically from builds)",
+      "needsPort": true
+    },
+    "dashboard": {
+      "type": "built-in",
+      "port": 3000,
+      "description": "Host manager web dashboard"
+    }
+  }
+}

@@ -122,9 +122,9 @@ public class RoomsPanelController : RuntimeFacadePanel
              i >= 0;
              i--)
         {
-            Destroy(
-                contentRoot.GetChild(i)
-                    .gameObject);
+            Transform child = contentRoot.GetChild(i);
+            if (child.GetComponent<RoomCardController>() != null)
+                Destroy(child.gameObject);
         }
     }
 }

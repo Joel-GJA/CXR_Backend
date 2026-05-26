@@ -199,6 +199,11 @@ public class XRNetworkManager : NetworkManager
 
         Debug.Log("[SERVER] Runtime Started");
 
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.ServerStarted,
+            nameof(XRNetworkManager),
+            "Mirror server runtime started.");
+
         ValidateInteractableNetworkTransforms();
 
         PrintRuntimeState();
@@ -232,6 +237,11 @@ public class XRNetworkManager : NetworkManager
         connectedClients.Clear();
 
         Debug.Log("[SERVER] Runtime Stopped");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.ServerStopped,
+            nameof(XRNetworkManager),
+            "Mirror server runtime stopped.");
 
         PrintRuntimeState();
     }

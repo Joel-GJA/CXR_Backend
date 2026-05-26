@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CXR Operations Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="topbar-copy">
+        <p class="eyebrow">CXR Admin Console</p>
+        <h1>Operations Dashboard</h1>
+        <p id="dashboardNotice" class="card-sub">Manage services, monitor rooms, view logs, and check system health.</p>
+      </div>
+      <div class="topbar-actions">
+        <span id="hostStatus" class="status">loading</span>
+        <span id="authStatus" class="status">Auth open</span>
+        <button data-action="set-token">Admin Token</button>
+        <button data-action="clear-token">Clear Token</button>
+      </div>
+    </header>
+
+    <nav class="tab-bar" id="tabBar">
+      <button class="tab active" data-tab="services">Services</button>
+      <button class="tab" data-tab="rooms">Rooms</button>
+      <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="health">Health</button>
+    </nav>
+
+    <div id="tabServices" class="tab-content active">
+      <section class="section-head">
+        <div>
+          <h2>Services</h2>
+          <p>Manage all processes running on this host. Start, stop, restart, and monitor services.</p>
+        </div>
+        <button class="primary" id="refreshServicesBtn" data-action="refresh">Refresh</button>
+      </section>
+      <section class="panel single-panel">
+        <div class="card">
+          <div class="card-head">
+            <h3>Start a Service</h3>
+          </div>
+          <div class="stack">
+            <label>
+              Template
+              <select id="serviceTemplateSelect"></select>
+            </label>
+            <div class="row">
+              <button class="primary" data-action="start-service">Start Service</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-head">
+            <h3>Running Services</h3>
+            <span id="serviceCount" class="pill">0 services</span>
+          </div>
+          <div id="serviceList" class="service-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <div id="tabRooms" class="tab-content">
+      <section class="section-head">
+        <div>
+          <h2>Room Control</h2>
+          <p>Create, monitor, and manage Unity room processes.</p>
+        </div>
+        <button class="primary" data-action="create-default">Add Test Room</button>
+      </section>
+
+      <section class="panel room-layout">
+        <div class="card">
+          <h3>Add Room</h3>
+          <div class="stack">
+            <label>
+              Intended room name
+              <input id="roomName" type="text" value="Anatomy Lab" />
+            </label>
+            <label>
+              Build
+              <select id="buildSelect"></select>
+            </label>
+            <label>
+              Max participants
+              <input id="maxParticipants" type="number" min="1" value="8" />
+            </label>
+            <div class="row">
+              <button class="primary" data-action="create-room">Add Room</button>
+              <button data-action="refresh">Refresh</button>
+            </div>
+            <div class="chips" id="quickChips"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Running Rooms</h3>
+            <span id="roomCount" class="pill">0 rooms</span>
+          </div>
+          <div id="roomList" class="room-list"></div>
+        </div>
+      </section>
+
+      <section class="panel monitor-layout">
+        <div class="card log-card">
+          <div class="card-head">
+            <div>
+              <h3>Registry Monitor</h3>
+              <p class="card-sub">Registry polling runs automatically so published room state stays live.</p>
+            </div>
+          </div>
+          <div class="stack hints compact">
+            <div class="hint-row">
+              <span>XR Debug Registry URL</span>
+              <code id="registryUrl"></code>
+            </div>
+          </div>
+          <pre id="registryActivity" class="terminal activity-terminal"></pre>
+          <pre id="registryLog" class="terminal split-terminal"></pre>
+        </div>
+
+        <div class="card log-card">
+          <div class="card-head">
+            <div>
+              <h3>Host Monitor</h3>
+              <p class="card-sub">Host manager logs and machine-level connection details update automatically.</p>
+            </div>
+          </div>
+          <div class="info-grid compact-grid">
+            <div class="stack hints compact">
+              <div class="hint-row">
+                <span>Host Manager URL</span>
+                <code id="hostManagerUrl"></code>
+              </div>
+              <div class="hint-row">
+                <span>Available Server IPs</span>
+                <code id="availableAddresses"></code>
+              </div>
+              <div class="hint-row warning-row" id="networkWarningRow">
+                <span>Network Warning</span>
+                <code id="networkWarning"></code>
+              </div>
+            </div>
+            <div class="stack hints compact">
+              <div class="hint-row">
+                <span>Automation Status</span>
+                <code>Room list, registry state, and per-room logs are auto-refreshed.</code>
+              </div>
+            </div>
+          </div>
+          <pre id="hostActivity" class="terminal activity-terminal"></pre>
+          <pre id="hostLog" class="terminal split-terminal"></pre>
+        </div>
+      </section>
+
+      <section class="section-head room-monitor-head">
+        <div>
+          <h2>Room Dashboards</h2>
+          <p>Each room gets one top summary panel and two equal bottom panels for registry/debug details and room output.</p>
+        </div>
+      </section>
+
+      <section id="roomMonitorGrid" class="panel room-monitor-grid"></section>
+    </div>
+
+    <div id="tabLogs" class="tab-content">
+      <section class="section-head">
+        <div>
+          <h2>Live Logs</h2>
+          <p>Stream logs from all services in real-time via WebSocket.</p>
+        </div>
+        <div class="row">
+          <button id="logPauseBtn" data-action="toggle-log-pause">Pause</button>
+          <button id="logClearBtn" data-action="clear-logs">Clear</button>
+        </div>
+      </section>
+      <section class="panel single-panel">
+        <div class="card">
+          <div class="log-controls">
+            <label>
+              Service
+              <select id="logServiceFilter">
+                <option value="">All Services</option>
+              </select>
+            </label>
+            <label>
+              Stream
+              <select id="logStreamFilter">
+                <option value="">All</option>
+                <option value="stdout">stdout</option>
+                <option value="stderr">stderr</option>
+              </select>
+            </label>
+            <label>
+              Search
+              <input id="logSearch" type="text" placeholder="Filter log lines..." />
+            </label>
+          </div>
+          <div id="logConnectionStatus" class="card-sub">Connecting to WebSocket...</div>
+          <pre id="logTerminal" class="terminal log-terminal">Waiting for logs...</pre>
+        </div>
+      </section>
+    </div>
+
+    <div id="tabHealth" class="tab-content">
+      <section class="section-head">
+        <div>
+          <h2>System Health</h2>
+          <p>Overall system status, process resource usage, and service availability.</p>
+        </div>
+        <button data-action="refresh">Refresh</button>
+      </section>
+      <section class="panel single-panel">
+        <div class="card">
+          <div class="card-head">
+            <h3>Services Overview</h3>
+            <span id="healthServiceCount" class="pill">0 services</span>
+          </div>
+          <div id="healthServiceGrid" class="health-grid"></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-head">
+            <h3>Registry Status</h3>
+          </div>
+          <pre id="healthRegistry" class="terminal health-terminal"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

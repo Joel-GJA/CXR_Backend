@@ -72,10 +72,18 @@ public class RuntimeEntity : NetworkBehaviour
         if (ownerNetId == newOwnerNetId)
             return;
 
+        uint previousOwnerNetId = ownerNetId;
         ownerNetId = newOwnerNetId;
 
         if (logLifecycle)
             Debug.Log($"[ENTITY] Ownership Changed | NetID={netId} | Owner={ownerNetId}");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.OwnershipTransferred,
+            nameof(RuntimeEntity),
+            $"Entity ownership transferred from {previousOwnerNetId} to {ownerNetId}.",
+            ownerNetId,
+            netId);
     }
 
     [Server]
@@ -84,10 +92,18 @@ public class RuntimeEntity : NetworkBehaviour
         if (ownerNetId == 0)
             return;
 
+        uint previousOwnerNetId = ownerNetId;
         ownerNetId = 0;
 
         if (logLifecycle)
             Debug.Log($"[ENTITY] Ownership Cleared | NetID={netId}");
+
+        RuntimeEventEmitter.Emit(
+            RuntimeEventType.OwnershipReleased,
+            nameof(RuntimeEntity),
+            "Entity ownership cleared.",
+            previousOwnerNetId,
+            netId);
     }
 
     // =========================
