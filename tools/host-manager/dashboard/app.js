@@ -21,6 +21,7 @@ const quickChips = ["Anatomy Lab", "Training Room", "Debug Room", "Client Join T
 const roomLogsById = new Map();
 const pendingRoomActions = new Set();
 let registryState = null;
+let orphanRooms = [];
 let wsLogSocket = null;
 
 hydrateTokenFromUrl();
@@ -80,6 +81,19 @@ document.addEventListener("click", event => {
       stopRoom(roomId).finally(() => pendingRoomActions.delete(roomId));
     } else if (roomAction === "restart") {
       restartRoom(roomId).finally(() => pendingRoomActions.delete(roomId));
+    }
+    return;
+  }
+
+  const orphanActionButton = event.target.closest("[data-orphan-action]");
+  if (orphanActionButton) {
+    const orphanId = orphanActionButton.dataset.orphanId;
+    const action = orphanActionButton.dataset.orphanAction;
+    const port = orphanActionButton.dataset.orphanPort;
+    if (action === "remove") {
+      removeOrphanRoom(orphanId);
+    } else if (action === "remove-kill") {
+      removeAndKillOrphanRoom(orphanId, port);
     }
     return;
   }
@@ -162,7 +176,8 @@ async function refreshAll() {
       refreshRooms(),
       refreshHostLog(),
       refreshRegistryState(),
-      refreshRequestActivity()
+      refreshRequestActivity(),
+      refreshOrphanRooms()
     ]);
     await refreshAllRoomLogs();
     renderRoomMonitors();
@@ -198,6 +213,16 @@ async function refreshHostLog() {
 async function refreshRegistryState() {
   registryState = await requestJson("/api/registry-state");
   renderRegistryState();
+}
+
+async function refreshOrphanRooms() {
+  try {
+    const payload = await requestJson("/api/registry-orphans");
+    orphanRooms = Array.isArray(payload.rooms) ? payload.rooms : [];
+  } catch (e) {
+    orphanRooms = [];
+  }
+  renderOrphanRooms();
 }
 
 async function refreshRequestActivity() {
@@ -307,6 +332,26 @@ async function restartRoom(roomId) {
     await refreshAll();
   } catch (error) {
     alert(error.message || `Failed to restart room ${roomId}.`);
+  }
+}
+
+async function removeOrphanRoom(registryRoomId) {
+  if (!registryRoomId) return;
+  try {
+    await authorizedFetch(`/api/registry/rooms/${encodeURIComponent(registryRoomId)}`, { method: "DELETE" });
+    await refreshAll();
+  } catch (error) {
+    alert(error.message || `Failed to remove room ${registryRoomId}.`);
+  }
+}
+
+async function removeAndKillOrphanRoom(registryRoomId, port) {
+  if (!registryRoomId) return;
+  try {
+    await authorizedFetch(`/api/registry/rooms/${encodeURIComponent(registryRoomId)}?port=${encodeURIComponent(port)}`, { method: "DELETE" });
+    await refreshAll();
+  } catch (error) {
+    alert(error.message || `Failed to remove and kill room ${registryRoomId}.`);
   }
 }
 
@@ -524,6 +569,57 @@ function renderRegistryState() {
   registryActivity.textContent = activityLines.join("\n");
 }
 
+function renderOrphanRooms() {
+  const container = document.getElementById("externalRoomList");
+  const count = document.getElementById("externalRoomCount");
+  const badge = document.getElementById("rogueRoomBadge");
+  if (!container) return;
+  if (orphanRooms.length === 0) {
+    container.innerHTML = `<div class="room-item"><div class="room-meta"><div class="room-title">No external rooms</div><div class="room-sub">All registry rooms are managed by this host manager.</div></div></div>`;
+    if (count) count.textContent = "0 rooms";
+    if (badge) {
+      badge.textContent = "0 rogue";
+      badge.classList.add("hidden");
+    }
+    dashboardNotice.textContent = "Manage services, monitor rooms, view logs, and check system health.";
+    dashboardNotice.classList.remove("warning");
+    return;
+  }
+  container.innerHTML = orphanRooms.map(renderOrphanRoomItem).join("");
+  if (count) count.textContent = `${orphanRooms.length} ${orphanRooms.length === 1 ? "room" : "rooms"}`;
+  if (badge) {
+    badge.textContent = `${orphanRooms.length} ${orphanRooms.length === 1 ? "rogue" : "rogues"}`;
+    badge.classList.remove("hidden");
+  }
+  dashboardNotice.textContent = `${orphanRooms.length} external room${orphanRooms.length === 1 ? "" : "s"} detected. Open the Rooms tab to remove stale registry entries or kill rogue processes.`;
+  dashboardNotice.classList.add("warning");
+}
+
+function renderOrphanRoomItem(room) {
+  const lastSeen = room.lastSeenUnixMs ? Math.floor((Date.now() - room.lastSeenUnixMs) / 1000) : null;
+  const lastSeenStr = lastSeen !== null ? `${lastSeen}s ago` : "unknown";
+  const hasHostManagerSource = Array.isArray(room.metadata) && room.metadata.some(m =>
+    (typeof m === "object" && m.Key === "source" && m.Value === "host-manager") ||
+    (typeof m === "string" && m === "source=host-manager")
+  );
+  const managedBadge = hasHostManagerSource
+    ? `<span class="orphan-badge managed">managed</span>`
+    : `<span class="orphan-badge rogue">rogue</span>`;
+  return `
+    <div class="room-item orphan-item" data-orphan-id="${escapeHtml(room.roomId)}">
+      <div class="room-meta">
+        <div class="room-title">${escapeHtml(room.roomName)} ${managedBadge}</div>
+        <div class="room-sub">${escapeHtml(room.roomId)} | ${escapeHtml(room.ipAddress)}:${room.port} | Players: ${room.playerCount ?? 0}/${room.maxPlayers ?? "?"}</div>
+        <div class="room-sub">Status: ${escapeHtml(room.status)} | Last seen: ${lastSeenStr}</div>
+      </div>
+      <div class="orphan-actions">
+        <button class="orphan-remove-btn" data-orphan-action="remove" data-orphan-id="${escapeHtml(room.roomId)}">Remove</button>
+        <button class="orphan-kill-btn" data-orphan-action="remove-kill" data-orphan-id="${escapeHtml(room.roomId)}" data-orphan-port="${room.port}">Remove & Kill</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderRequestActivity() {
   const requestLines = [
     "HOST MANAGER HTTP ACTIVITY",
@@ -593,9 +689,9 @@ function renderRoomMonitorCard(room) {
   const expandedClass = isRoomExpanded(room.roomId) ? " expanded" : "";
   const health = getRoomHealth(room);
   const healthDot = health.isHealthy ? "\u{1F7E2}" : health.status === "running" ? "\u{1F7E1}" : "\u{1F534}";
-  const postActivity = getRoomPostActivity(room.roomId);
+  const postActivity = getRoomPostActivity(room);
   const getActivity = getRoomGetActivity(room.roomId);
-  const clientEvents = deriveClientEvents(room.roomId);
+  const clientEvents = deriveClientEvents(room);
   const connLogs = parseConnectionLogs(room.roomId);
   const restActivityLines = [
     ...(postActivity.length ? ["-- POST (Room \u2192 Registry) --", ...postActivity] : []),
@@ -740,10 +836,13 @@ function formatRoomActivity(event) {
   return parts.join(" | ");
 }
 
-function getRoomPostActivity(roomId) {
+function getRoomPostActivity(room) {
   if (!Array.isArray(registryState?.events)) return [];
+  const registryRoom = findRegistryRoom(room);
+  const effectiveRoomId = registryRoom?.roomId || null;
+  if (!effectiveRoomId) return [];
   return registryState.events
-    .filter(e => e.type === "room-upsert" && e.roomId === roomId)
+    .filter(e => e.type === "room-upsert" && e.roomId === effectiveRoomId)
     .slice(-10)
     .map(e => `${e.timestamp || ""} | heartbeat | players=${e.playerCount}/${e.maxPlayers} | ${e.status}`);
 }
@@ -756,9 +855,12 @@ function getRoomGetActivity(roomId) {
     .map(e => `${e.timestamp || ""} | ${e.originalPath || ""} -> ${e.statusCode} | ${e.durationMs}ms | ${e.remoteAddress || ""}`);
 }
 
-function deriveClientEvents(roomId) {
+function deriveClientEvents(room) {
   if (!Array.isArray(registryState?.events)) return [];
-  const events = registryState.events.filter(e => e.type === "room-upsert" && e.roomId === roomId);
+  const registryRoom = findRegistryRoom(room);
+  const effectiveRoomId = registryRoom?.roomId || null;
+  if (!effectiveRoomId) return [];
+  const events = registryState.events.filter(e => e.type === "room-upsert" && e.roomId === effectiveRoomId);
   const derived = [];
   for (let i = 1; i < events.length; i++) {
     const prev = events[i - 1];
@@ -769,6 +871,13 @@ function deriveClientEvents(roomId) {
       derived.push(`${curr.timestamp || ""} | Player joined (${prevCount}\u2192${currCount}/${curr.maxPlayers})`);
     } else if (currCount < prevCount) {
       derived.push(`${curr.timestamp || ""} | Player left (${prevCount}\u2192${currCount}/${curr.maxPlayers})`);
+    }
+  }
+  if (events.length > 0) {
+    const latest = events[events.length - 1];
+    const currCount = Number(latest.playerCount) || 0;
+    if (currCount > 0) {
+      derived.push(`${latest.timestamp || ""} | ${currCount} client(s) connected (${currCount}/${latest.maxPlayers})`);
     }
   }
   return derived.slice(-10);

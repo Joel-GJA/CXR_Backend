@@ -1,6 +1,18 @@
 const { spawn } = require("child_process");
 const crypto = require("crypto");
+const net = require("net");
 const EventEmitter = require("events");
+
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, "127.0.0.1");
+  });
+}
 
 class ProcessManager extends EventEmitter {
   constructor(config, logRotator) {
@@ -9,12 +21,17 @@ class ProcessManager extends EventEmitter {
     this.logRotator = logRotator;
     this.services = new Map();
     this._metricsIntervals = new Map();
+    this.crashRecoveryEnabled = true;
   }
 
-  start(resolvedTemplate, overrides = {}) {
+  setCrashRecovery(enabled) {
+    this.crashRecoveryEnabled = enabled;
+  }
+
+  async start(resolvedTemplate, overrides = {}) {
     const serviceId = overrides.serviceId || `srv-${crypto.randomBytes(3).toString("hex")}`;
     const needsPort = resolvedTemplate.needsPort === true || overrides.port != null;
-    const port = overrides.port != null ? overrides.port : (needsPort ? this.allocatePort() : 0);
+    const port = overrides.port != null ? overrides.port : (needsPort ? await this.allocatePort() : 0);
 
     const service = {
       serviceId,
@@ -99,17 +116,33 @@ class ProcessManager extends EventEmitter {
     this.services.delete(serviceId);
   }
 
-  allocatePort() {
+  async allocatePort() {
     const usedPorts = new Set(
       Array.from(this.services.values())
         .filter(s => s.status !== "stopped" && s.status !== "failed")
         .map(s => s.port)
         .filter(p => p > 0)
     );
+    const reservedPorts = this._getReservedPorts();
     for (let port = this.config.roomPortRange.start; port <= this.config.roomPortRange.end; port++) {
-      if (!usedPorts.has(port)) return port;
+      if (usedPorts.has(port) || reservedPorts.has(port)) continue;
+      if (await isPortAvailable(port)) return port;
     }
     throw new Error("No free ports available.");
+  }
+
+  _getReservedPorts() {
+    const reserved = new Set();
+    if (this.config.hostManagerPort) {
+      reserved.add(this.config.hostManagerPort);
+    }
+    if (this.config.registryUrl) {
+      try {
+        const parsed = new URL(this.config.registryUrl);
+        if (parsed.port) reserved.add(Number(parsed.port));
+      } catch (_) {}
+    }
+    return reserved;
   }
 
   _spawn(service) {
@@ -156,7 +189,9 @@ class ProcessManager extends EventEmitter {
     });
 
     childProcess.on("exit", (code, signal) => {
-      const shouldRestart = service.pendingRestart && service.restartCount < service.maxRestarts;
+      const wasIntentional = service.pendingRestart;
+      const wasCrash = this.crashRecoveryEnabled && code !== 0 && signal !== "SIGTERM";
+      const shouldRestart = (wasIntentional || wasCrash) && service.restartCount < service.maxRestarts;
       service.lastExitCode = code;
       service.lastExitSignal = signal;
       service.stoppedAtUtc = new Date().toISOString();
@@ -318,6 +353,7 @@ class ProcessManager extends EventEmitter {
   }
 
   shutdown() {
+    this.crashRecoveryEnabled = false;
     for (const [id, interval] of this._metricsIntervals) {
       clearInterval(interval);
     }

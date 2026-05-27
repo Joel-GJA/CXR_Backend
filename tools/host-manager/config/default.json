@@ -7,6 +7,8 @@
   },
   "registryUrl": "http://127.0.0.1:8080",
   "logsDirectory": "../logs",
+  "autoCleanRogueRooms": false,
+  "autoCleanIntervalMs": 5000,
   "templates": {
     "room-registry": {
       "executable": "node",
@@ -14,7 +16,7 @@
       "cwd": "../../registry",
       "env": {
         "CXR_REGISTRY_PORT": "8080",
-        "CXR_REGISTRY_STALE_MS": "90000"
+        "CXR_REGISTRY_STALE_MS": "0"
       },
       "description": "Room registry service"
     },

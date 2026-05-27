@@ -1,8 +1,21 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const net = require("net");
+const { exec } = require("child_process");
 
 const MAX_RESTARTS = 10;
+
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, "127.0.0.1");
+  });
+}
 
 class RoomManager {
   constructor(config, processManager) {
@@ -100,10 +113,10 @@ class RoomManager {
     return this.recentActivity.slice(-Math.max(1, limit));
   }
 
-  createRoom(requestBody = {}) {
+  async createRoom(requestBody = {}) {
     const requestedName = normalizeRequestedName(requestBody.requestedName);
     const roomId = createRoomId();
-    const port = this.allocatePort();
+    const port = await this.allocatePort();
     const metadata = normalizeMetadata(requestBody.metadata);
     const maxParticipants = normalizePositiveInteger(requestBody.maxParticipants);
     const requestedBuildId = normalizeBuildId(requestBody.buildId, this.buildIds);
@@ -147,7 +160,7 @@ class RoomManager {
     this.serviceIdToRoomId.set(roomId, roomId);
 
     try {
-      this.processManager.start(
+      await this.processManager.start(
         {
           type: "process",
           executable: launchCommand.executable,
@@ -221,6 +234,19 @@ class RoomManager {
     return this.serializeRoom(room);
   }
 
+  restartAllRooms() {
+    const roomIds = Array.from(this.rooms.keys());
+    if (roomIds.length === 0) return;
+    this.log("info", `Restarting all ${roomIds.length} rooms due to IP change`);
+    for (const roomId of roomIds) {
+      try {
+        this.restartRoom(roomId);
+      } catch (e) {
+        this.log("error", `Failed to restart room ${roomId}: ${e.message}`);
+      }
+    }
+  }
+
   buildLaunchCommand(buildId, build, roomId, requestedName, port, maxParticipants, metadata) {
     const args = [
       "-batchmode",
@@ -259,15 +285,31 @@ class RoomManager {
     };
   }
 
-  allocatePort() {
+  _getReservedPorts() {
+    const reserved = new Set();
+    if (this.config.hostManagerPort) {
+      reserved.add(this.config.hostManagerPort);
+    }
+    if (this.config.registryUrl) {
+      try {
+        const parsed = new URL(this.config.registryUrl);
+        if (parsed.port) reserved.add(Number(parsed.port));
+      } catch (_) {}
+    }
+    return reserved;
+  }
+
+  async allocatePort() {
     const usedPorts = new Set(
       Array.from(this.rooms.values())
         .filter(room => room.status !== "stopped" && room.status !== "failed")
         .map(room => room.port)
     );
+    const reservedPorts = this._getReservedPorts();
 
     for (let port = this.config.roomPortRange.start; port <= this.config.roomPortRange.end; port += 1) {
-      if (!usedPorts.has(port)) {
+      if (usedPorts.has(port) || reservedPorts.has(port)) continue;
+      if (await isPortAvailable(port)) {
         return port;
       }
     }
@@ -335,6 +377,54 @@ class RoomManager {
       request.on("timeout", () => { request.destroy(new Error("Registry delete request timed out.")); });
       request.on("error", reject);
       request.end();
+    });
+  }
+
+  killProcessByPort(port) {
+    return new Promise((resolve) => {
+      const isWindows = process.platform === "win32";
+      const findCmd = isWindows
+        ? `netstat -ano | findstr ":${port}"`
+        : `lsof -ti :${port}`;
+
+      exec(findCmd, { timeout: 5000 }, (error, stdout) => {
+        if (error || !stdout.trim()) {
+          resolve({ killed: false, error: error ? error.message : "No process found on port" });
+          return;
+        }
+
+        let pid = null;
+        if (isWindows) {
+          const lines = stdout.trim().split(/\r?\n/);
+          for (const line of lines) {
+            const parts = line.trim().split(/\s+/);
+            const last = parts[parts.length - 1];
+            if (/^\d+$/.test(last)) {
+              const match = line.match(/(\d+)\s*$/);
+              if (match) {
+                pid = match[1];
+                break;
+              }
+            }
+          }
+        } else {
+          pid = stdout.trim().split(/\r?\n/)[0].trim();
+        }
+
+        if (!pid) {
+          resolve({ killed: false, error: "Could not parse PID from port lookup" });
+          return;
+        }
+
+        const killCmd = isWindows ? `taskkill /F /PID ${pid}` : `kill -9 ${pid}`;
+        exec(killCmd, { timeout: 5000 }, (killError) => {
+          if (killError) {
+            resolve({ killed: false, pid, error: killError.message });
+          } else {
+            resolve({ killed: true, pid });
+          }
+        });
+      });
     });
   }
 

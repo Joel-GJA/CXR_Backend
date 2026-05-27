@@ -76,6 +76,7 @@ function gracefulShutdownHostManager() {
   roomManager.log("info", "Shutting down host manager...");
   roomManager.shuttingDown = true;
   telemetryForwarder.stop();
+  processManager.setCrashRecovery(false);
   processManager.shutdown();
   roomManager.shutdown();
   logWsServer.close();
@@ -113,6 +114,26 @@ server.listen(config.hostManagerPort, "0.0.0.0", () => {
 
     telemetryForwarder.start();
     roomManager.log("info", "Telemetry forwarder started");
+
+    if (rawConfig.autoCleanRogueRooms) {
+      const interval = rawConfig.autoCleanIntervalMs || 30000;
+      setInterval(() => {
+        autoCleanRogueRooms().catch(e => roomManager.log("error", `Auto-clean error: ${e.message}`));
+      }, interval);
+      roomManager.log("info", `Auto-clean enabled, interval=${interval}ms`);
+    }
+
+    setInterval(() => {
+      const detectedAddresses = getAvailableIPv4Addresses();
+      const detected = detectedAddresses[0] || "127.0.0.1";
+      if (detected !== config.publicAddress) {
+        const old = config.publicAddress;
+        config.publicAddress = detected;
+        roomManager.log("info", `Public address changed: ${old} -> ${detected}`);
+        roomManager.restartAllRooms();
+      }
+    }, 10000);
+    roomManager.log("info", "Public address auto-detection enabled, interval=10000ms");
 });
 
 async function handleRequest(request, response) {
@@ -231,6 +252,40 @@ async function handleRequest(request, response) {
       return;
     }
 
+    const orphanRoomsRoute = getRouteMatch(request, "GET", "/api/registry-orphans");
+    if (orphanRoomsRoute.matched) {
+      const orphans = await getOrphanRooms();
+      sendJson(response, 200, { rooms: orphans });
+      return;
+    }
+
+    const removeRegistryRoomRoute = getRouteMatch(request, "DELETE", "/api/registry/rooms/:id");
+    if (removeRegistryRoomRoute.matched) {
+      const registryRoomId = decodeURIComponent(removeRegistryRoomRoute.params.id);
+      const queryPort = request.url.includes("port=") ? Number.parseInt(new URL(request.url, `http://${request.headers.host}`).searchParams.get("port"), 10) : null;
+      try {
+        await roomManager.deleteRegistryRoom(registryRoomId);
+        let killResult = null;
+        if (queryPort && queryPort > 0) {
+          killResult = await roomManager.killProcessByPort(queryPort);
+        }
+        sendJson(response, 200, { ok: true, killResult });
+      } catch (error) {
+        sendError(response, 400, error.message);
+      }
+      return;
+    }
+
+    const autoCleanRoute = getRouteMatch(request, "POST", "/api/registry/auto-clean");
+    if (autoCleanRoute.matched) {
+      autoCleanRogueRooms().then(() => {
+        sendJson(response, 200, { ok: true });
+      }).catch(error => {
+        sendError(response, 400, error.message);
+      });
+      return;
+    }
+
     const roomLogRoute = getRouteMatch(request, "GET", "/api/logs/rooms/:id");
     if (roomLogRoute.matched) {
       const room = roomManager.getRoom(roomLogRoute.params.id);
@@ -268,7 +323,7 @@ async function handleRequest(request, response) {
     const createRoomRoute = getRouteMatch(request, "POST", "/rooms");
     if (createRoomRoute.matched) {
       const body = await readJsonBody(request);
-      const room = roomManager.createRoom(body);
+      const room = await roomManager.createRoom(body);
       sendJson(response, 201, room);
       return;
     }
@@ -691,6 +746,73 @@ function fetchJson(urlString) {
 
 function fetchJsonOptional(urlString, fallbackValue) {
   return fetchJson(urlString).catch(() => fallbackValue);
+}
+
+function getMetadataValue(metadata, key) {
+  if (!Array.isArray(metadata)) return null;
+  for (const item of metadata) {
+    if (typeof item === "object" && item.Key === key) return item.Value;
+    if (typeof item === "string" && item.startsWith(`${key}=`)) return item.slice(key.length + 1);
+  }
+  return null;
+}
+
+function isManagedByHostManager(registryRoom, managedRooms) {
+  const regIp = registryRoom.ipAddress;
+  const regPort = registryRoom.port;
+  const regRoomId = registryRoom.roomId;
+  const sourceHostManager = getMetadataValue(registryRoom.metadata, "source");
+  const metaRoomId = getMetadataValue(registryRoom.metadata, "roomId");
+
+  for (const room of managedRooms) {
+    if (room.ip === regIp && room.port === regPort) return true;
+    if (room.roomId === regRoomId) return true;
+    if (sourceHostManager === "host-manager" && metaRoomId && metaRoomId === room.roomId) return true;
+  }
+  return false;
+}
+
+async function getOrphanRooms() {
+  const state = await getRegistryState();
+  if (!state.ok || !Array.isArray(state.rooms)) return [];
+  const managedRooms = roomManager.listRooms();
+  return state.rooms.filter(room => !isManagedByHostManager(room, managedRooms));
+}
+
+async function autoCleanRogueRooms() {
+  if (!config.registryUrl || !rawConfig.autoCleanRogueRooms) return;
+  try {
+    const state = await getRegistryState();
+    if (!state.ok || !Array.isArray(state.rooms)) return;
+    const managedRooms = roomManager.listRooms();
+    const staleAfterMs = state.health?.staleAfterMs || 90000;
+    const cutoff = Date.now() - staleAfterMs;
+
+    for (const room of state.rooms) {
+      if (room.ipAddress !== config.publicAddress) continue;
+      if (isManagedByHostManager(room, managedRooms)) continue;
+      if ((room.lastSeenUnixMs || 0) > cutoff) continue;
+
+      roomManager.log("info", `Auto-clean: removing rogue room ${room.roomId} (${room.roomName}) on ${room.ipAddress}:${room.port}`);
+      try {
+        await roomManager.deleteRegistryRoom(room.roomId);
+        roomManager.recordActivity("auto-clean-registry-remove", { roomId: room.roomId, port: room.port, roomName: room.roomName });
+      } catch (e) {
+        roomManager.log("error", `Auto-clean: failed to delete registry entry for ${room.roomId}: ${e.message}`);
+      }
+      try {
+        const result = await roomManager.killProcessByPort(room.port);
+        if (result.killed) {
+          roomManager.log("info", `Auto-clean: killed process ${result.pid} on port ${room.port}`);
+          roomManager.recordActivity("auto-clean-kill", { port: room.port, pid: result.pid });
+        }
+      } catch (e) {
+        roomManager.log("error", `Auto-clean: failed to kill process on port ${room.port}: ${e.message}`);
+      }
+    }
+  } catch (error) {
+    roomManager.log("error", `Auto-clean cycle error: ${error.message}`);
+  }
 }
 
 function recordRequestActivity(request, statusCode, startedAt) {

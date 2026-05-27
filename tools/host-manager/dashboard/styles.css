@@ -191,6 +191,28 @@ button.danger {
   border: 1px solid var(--border);
 }
 
+.hidden {
+  display: none !important;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 210, 138, 0.14);
+  border: 1px solid rgba(255, 210, 138, 0.28);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.card-sub.warning {
+  color: var(--warning);
+}
+
 .room-list,
 .service-list {
   display: grid;
@@ -654,6 +676,65 @@ button.danger {
 
 .build-content.hidden {
   display: none;
+}
+
+.orphan-item {
+  border-color: rgba(255, 210, 138, 0.25);
+  cursor: default;
+}
+
+.orphan-item:hover {
+  transform: none;
+  border-color: rgba(255, 210, 138, 0.4);
+}
+
+.orphan-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.orphan-badge.managed {
+  background: rgba(143, 211, 111, 0.12);
+  color: var(--accent);
+}
+
+.orphan-badge.rogue {
+  background: rgba(255, 210, 138, 0.12);
+  color: var(--warning);
+}
+
+.orphan-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.orphan-remove-btn,
+.orphan-kill-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.orphan-remove-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+}
+
+.orphan-kill-btn {
+  background: rgba(255, 128, 111, 0.12);
+  border: 1px solid rgba(255, 128, 111, 0.3);
+  color: var(--danger);
+}
+
+.orphan-kill-btn:hover {
+  background: rgba(255, 128, 111, 0.25);
 }
 
 .build-badge {

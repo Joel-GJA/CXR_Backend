@@ -24,7 +24,7 @@
 
     <nav class="tab-bar" id="tabBar">
       <button class="tab active" data-tab="services">Services</button>
-      <button class="tab" data-tab="rooms">Rooms</button>
+      <button class="tab" data-tab="rooms">Rooms <span id="rogueRoomBadge" class="tab-badge hidden">0 rogue</span></button>
       <button class="tab" data-tab="logs">Logs</button>
       <button class="tab" data-tab="health">Health</button>
     </nav>
@@ -101,6 +101,17 @@
             <span id="roomCount" class="pill">0 rooms</span>
           </div>
           <div id="roomList" class="room-list"></div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 8px">
+        <div class="card">
+          <div class="card-head">
+            <h3>External Rooms (Registry)</h3>
+            <span id="externalRoomCount" class="pill">0 rooms</span>
+          </div>
+          <p class="card-sub">Rooms registered in the registry but not managed by this host manager. Remove entries or kill rogue processes.</p>
+          <div id="externalRoomList" class="room-list" style="margin-top: 10px"></div>
         </div>
       </section>
 
