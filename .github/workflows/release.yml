@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+  UNITY_VERSION: 6000.0.23f1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**') }}
+          restore-keys: |
+            Library-${{ env.UNITY_VERSION }}-
+
+      - name: Build Unity Headless Server
+        uses: game-ci/unity-builder@v4
+        with:
+          targetPlatform: linux-headless
+          buildName: CXR_Server
+          buildsPath: Builds/headless
+          versioning: SemVer
+
+      - name: Build Unity Client
+        uses: game-ci/unity-builder@v4
+        with:
+          targetPlatform: linux-x86_64
+          buildName: CXR_Client
+          buildsPath: Builds/client
+          versioning: SemVer
+
+      - name: Run Editor Tests
+        uses: game-ci/unity-test-runner@v4
+        with:
+          testMode: EditMode
+          artifactsPath: TestResults/EditMode
+
+      - name: Package CXR SDK
+        run: |
+          mkdir -p artifacts
+          # Package scripts + docs
+          Compress-Archive -Path scripts, docs -DestinationPath artifacts/cxr-tools.zip
+          # Package Unity SDK (if exists)
+          if (Test-Path "Assets/Multiplayer/SDK") {
+            & "C:\Program Files\Unity\Hub\Editor\$env:UNITY_VERSION\Editor\Unity.exe" -quit -batchmode -exportPackage "Assets/Multiplayer/SDK" "artifacts/cxr-sdk.unitypackage" -logFile sdk-export.log
+          }
+
+      - name: Generate Changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          configuration: '{"categories":[{"title":"Features","labels":["feat"]},{"title":"Fixes","labels":["fix"]},{"title":"Maintenance","labels":["chore","docs","refactor"]}],"template":"# Changelog\n\n$UNCATEGORIZED\n$CATEGORIES\n"}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.changelog }}
+          files: |
+            Builds/headless/CXR_Server.tar.gz
+            Builds/client/CXR_Client.tar.gz
+            artifacts/cxr-tools.zip
+            artifacts/cxr-sdk.unitypackage
+          draft: true
+          prerelease: false

@@ -1,0 +1,71 @@
+name: CI - Build & Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+  UNITY_VERSION: 6000.0.23f1
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**') }}
+          restore-keys: |
+            Library-${{ env.UNITY_VERSION }}-
+
+      - name: Build Unity Headless Server
+        uses: game-ci/unity-builder@v4
+        with:
+          targetPlatform: linux-headless
+          buildName: CXR_Server
+          buildsPath: Builds/headless
+          versioning: SemVer
+
+      - name: Build Unity Client
+        uses: game-ci/unity-builder@v4
+        with:
+          targetPlatform: linux-x86_64
+          buildName: CXR_Client
+          buildsPath: Builds/client
+          versioning: SemVer
+
+      - name: Run Editor Tests
+        uses: game-ci/unity-test-runner@v4
+        with:
+          testMode: EditMode
+          artifactsPath: TestResults/EditMode
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+      - name: Upload Build Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-builds
+          path: Builds/

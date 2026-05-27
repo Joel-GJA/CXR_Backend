@@ -1,0 +1,80 @@
+name: CI - Lint & Validate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate version.json files
+        run: |
+          for f in $(find . -name 'version.json' -not -path '*/node_modules/*' 2>/dev/null); do
+            echo "Checking $f"
+            node -e "
+              const v = JSON.parse(require('fs').readFileSync('$f','utf8'));
+              const required = ['toolVersion','protocolVersion','sdkVersion'];
+              for (const key of required) {
+                if (!v[key]) { console.error('Missing: ' + key); process.exit(1); }
+              }
+              console.log('  OK: ' + v.toolVersion);
+            " || exit 1
+          done
+          echo "All version.json files valid."
+
+      - name: Validate profile JSONs
+        run: |
+          for f in $(find . -path '*/profiles/*.json' -not -path '*/node_modules/*' 2>/dev/null); do
+            echo "Checking $f"
+            node -e "
+              const p = JSON.parse(require('fs').readFileSync('$f','utf8'));
+              const schema = ['profile','maxPlayers','enableTelemetry','logLevel','heartbeatIntervalMs','roomTimeoutMs'];
+              for (const key of schema) {
+                if (p[key] === undefined) { console.error('Missing: ' + key); process.exit(1); }
+              }
+              const valid = ['development','classroom','demo'];
+              if (!valid.includes(p.profile)) { console.error('Invalid profile: ' + p.profile); process.exit(1); }
+              console.log('  OK: ' + p.profile);
+            " || exit 1
+          done
+          echo "All profile JSONs valid."
+
+      - name: Validate docs/adr structure
+        run: |
+          if [ -d "docs/adr" ]; then
+            echo "ADR directory exists."
+            count=$(ls docs/adr/*.md 2>/dev/null | wc -l)
+            echo "  ADR count: $count"
+          else
+            echo "No docs/adr directory (optional)."
+          fi
+
+      - name: Run PowerShell script analyzer
+        shell: pwsh
+        run: |
+          $scripts = Get-ChildItem -Recurse -Filter "*.ps1" -Path "scripts" -ErrorAction SilentlyContinue
+          if ($scripts.Count -eq 0) {
+            Write-Host "No PowerShell scripts found."
+            return
+          }
+          foreach ($s in $scripts) {
+            Write-Host "Analyzing $($s.Name)..."
+            $result = Invoke-ScriptAnalyzer -Path $s.FullName -Severity Error 2>$null
+            if ($result) {
+              $result | Format-Table
+              Write-Error "Issues found in $($s.Name)"
+            }
+          }
+          Write-Host "All scripts passed analysis."
