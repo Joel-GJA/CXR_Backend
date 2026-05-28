@@ -3,19 +3,27 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, Boxes, Server, Terminal,
-  HeartPulse, Activity, UploadCloud, Sun, Moon, ChevronLeft, ChevronRight,
+  HeartPulse, Activity, UploadCloud, Users, LogOut,
+  Sun, Moon, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import { useAuth }  from '../contexts/AuthContext.jsx';
 import { cn } from '../lib/utils.js';
 
-const NAV = [
-  { to: '/overview',    icon: LayoutDashboard, label: 'Overview'    },
+const ROLE_COLORS = {
+  admin:    'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  operator: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  viewer:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+};
+
+const NAV_BASE = [
+  { to: '/overview',    icon: LayoutDashboard, label: 'Overview'     },
   { to: '/hostmanager', icon: Zap,             label: 'Host Manager', tag: 'CORE' },
-  { to: '/rooms',       icon: Boxes,           label: 'Rooms'       },
-  { to: '/services',    icon: Server,          label: 'Services'    },
-  { to: '/logs',        icon: Terminal,        label: 'Live Logs'   },
-  { to: '/health',      icon: HeartPulse,      label: 'Health'      },
-  { to: '/events',      icon: Activity,        label: 'Events'      },
+  { to: '/rooms',       icon: Boxes,           label: 'Rooms'        },
+  { to: '/services',    icon: Server,          label: 'Services'     },
+  { to: '/logs',        icon: Terminal,        label: 'Live Logs'    },
+  { to: '/health',      icon: HeartPulse,      label: 'Health'       },
+  { to: '/events',      icon: Activity,        label: 'Events'       },
   { to: '/builds',      icon: UploadCloud,     label: 'Build Upload' },
 ];
 
@@ -26,7 +34,12 @@ const navItem = {
 
 export default function Layout({ children }) {
   const { isDark, toggle } = useTheme();
+  const { user, logout }   = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  const NAV = user?.role === 'admin'
+    ? [...NAV_BASE, { to: '/users', icon: Users, label: 'Users', tag: 'ADMIN' }]
+    : NAV_BASE;
 
   return (
     <div className={cn(
@@ -150,6 +163,28 @@ export default function Layout({ children }) {
 
         {/* Footer */}
         <div className="border-t border-white/5 p-2 space-y-0.5">
+          {/* User info */}
+          {user && !collapsed && (
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/5 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400 flex-shrink-0">
+                {user.username[0].toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-white truncate">{user.username}</div>
+                <span className={cn('text-[9px] font-bold uppercase tracking-wider border rounded-full px-1.5 py-0.5', ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
+                  {user.role}
+                </span>
+              </div>
+            </div>
+          )}
+          {user && collapsed && (
+            <div className="flex justify-center py-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400">
+                {user.username[0].toUpperCase()}
+              </div>
+            </div>
+          )}
+
           {/* Theme toggle */}
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
@@ -172,16 +207,24 @@ export default function Layout({ children }) {
             </AnimatePresence>
           </motion.button>
 
-          {/* Status */}
-          {!collapsed && (
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="relative flex h-2 w-2 flex-shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-              </span>
-              <span className="text-[11px] text-slate-500">Online · Port 4000</span>
-            </div>
-          )}
+          {/* Logout */}
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={logout}
+            className={cn(
+              'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] text-slate-400 hover:text-red-400 hover:bg-red-500/[0.06] transition-all border border-transparent',
+              collapsed && 'justify-center',
+            )}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            <AnimatePresence>
+              {!collapsed && (
+                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  Sign out
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
 
           {/* Collapse */}
           <motion.button

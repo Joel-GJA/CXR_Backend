@@ -4,6 +4,8 @@ const path       = require('path');
 const fs         = require('fs');
 const cors       = require('cors');
 const config     = require('./config');
+const jwtAuth    = require('./auth/jwt');
+const userStore  = require('./auth/users');
 
 // ── Ash's host-manager modules (integrated directly) ─────────────────────────
 const ProcessManager     = require('./hm/processManager');
@@ -27,6 +29,9 @@ const { sendJson, sendError, readJsonBody, getRouteMatch } = (() => {
   }
 })();
 
+// ── Ensure default admin user exists ─────────────────────────────────────────
+userStore.ensureDefaultAdmin();
+
 // ── Init host-manager subsystem ──────────────────────────────────────────────
 fs.mkdirSync(config.logsDirectory, { recursive: true });
 fs.mkdirSync(path.dirname(config.eventsJsonlPath), { recursive: true });
@@ -42,17 +47,31 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
-function isAuthorized(req) {
-  if (!config.adminToken) return true;
-  const hdr = req.headers['x-cxr-admin-token'];
-  if (typeof hdr === 'string' && hdr === config.adminToken) return true;
-  const auth = req.headers['authorization'];
-  return typeof auth === 'string' && auth === `Bearer ${config.adminToken}`;
+function authMiddleware(req, res, next) {
+  // Accept legacy static token (for Unity / external API clients)
+  if (config.adminToken) {
+    const hdr = req.headers['x-cxr-admin-token'];
+    if (typeof hdr === 'string' && hdr === config.adminToken) {
+      req.user = { username: 'api-token', role: 'admin' };
+      return next();
+    }
+  }
+  // JWT from panel login
+  const token = jwtAuth.extractBearer(req);
+  if (token) {
+    const payload = jwtAuth.verify(token);
+    if (payload) { req.user = { username: payload.username, role: payload.role }; return next(); }
+  }
+  return res.status(401).json({ error: 'unauthorized' });
 }
 
-function authMiddleware(req, res, next) {
-  if (!isAuthorized(req)) return res.status(401).json({ error: 'unauthorized' });
-  next();
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: `Requires role: ${roles.join(' or ')}` });
+    }
+    next();
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -290,6 +309,14 @@ app.get('/api/logs/services/:id', authMiddleware, (req, res) => {
     });
   } catch (err) { res.status(404).json({ error: err.message }); }
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// AUTH (login is public; all other /api/auth/* require JWT)
+// ────────────────────────────────────────────────────────────────────────────
+app.use('/api/auth', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/login') return next();
+  return authMiddleware(req, res, next);
+}, require('./routes/auth'));
 
 // ────────────────────────────────────────────────────────────────────────────
 // EVENTS (Nareen's persistence)

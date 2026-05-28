@@ -1,14 +1,36 @@
+function getToken() { return localStorage.getItem('cxr_token') || ''; }
+
 async function fetchJson(path, opts = {}) {
+  const token = getToken();
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts.headers,
+    },
     ...opts,
   });
+  if (res.status === 401) {
+    localStorage.removeItem('cxr_token');
+    window.dispatchEvent(new Event('cxr:logout'));
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || err.message || `HTTP ${res.status}`);
   }
   return res.json();
 }
+
+export const auth = {
+  login:          (username, password) => fetchJson('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  me:             ()                   => fetchJson('/api/auth/me'),
+  listUsers:      ()                   => fetchJson('/api/auth/users'),
+  createUser:     (data)               => fetchJson('/api/auth/users',                                  { method: 'POST',   body: JSON.stringify(data) }),
+  deleteUser:     (username)           => fetchJson(`/api/auth/users/${encodeURIComponent(username)}`,  { method: 'DELETE' }),
+  updateRole:     (username, role)     => fetchJson(`/api/auth/users/${encodeURIComponent(username)}/role`,     { method: 'PUT', body: JSON.stringify({ role }) }),
+  changePassword: (username, password) => fetchJson(`/api/auth/users/${encodeURIComponent(username)}/password`, { method: 'PUT', body: JSON.stringify({ password }) }),
+  changeMyPassword:(password)          => fetchJson('/api/auth/me/password',                            { method: 'PUT',    body: JSON.stringify({ password }) }),
+};
 
 // ── Host Manager (now built into the panel — direct routes) ──────────────────
 export const hm = {
@@ -58,6 +80,7 @@ export const buildsApi = {
       formData.append('build', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/builds/upload');
+      const t = getToken(); if (t) xhr.setRequestHeader('Authorization', `Bearer ${t}`);
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
