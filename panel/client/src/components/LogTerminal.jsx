@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-export default function LogTerminal({ lines = [], height = 'md', autoScroll = true }) {
+export default function LogTerminal({ lines = [], height = 'md', autoScroll = true, label = 'terminal' }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -18,13 +18,21 @@ export default function LogTerminal({ lines = [], height = 'md', autoScroll = tr
   }
 
   return (
-    <div ref={ref} className={`terminal terminal-${height}`}>
-      {lines.length === 0
-        ? <span className="muted">No output yet...</span>
-        : lines.map((line, i) => (
-            <div key={i} className={lineClass(line)}>{line}</div>
-          ))
-      }
+    <div className="terminal-wrap">
+      <div className="terminal-chrome">
+        <span className="tc-dot red" />
+        <span className="tc-dot yellow" />
+        <span className="tc-dot green" />
+        <span className="tc-label">{label}</span>
+      </div>
+      <div ref={ref} className={`terminal terminal-${height}`}>
+        {lines.length === 0
+          ? <span className="muted">No output yet...</span>
+          : lines.map((line, i) => (
+              <div key={i} className={lineClass(line)}>{line}</div>
+            ))
+        }
+      </div>
     </div>
   );
 }
