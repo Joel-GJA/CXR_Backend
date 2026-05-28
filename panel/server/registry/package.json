@@ -1,0 +1,10 @@
+{
+  "name": "cxr-room-registry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Independent room registry for Ubuntu-hosted CXR room processes.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

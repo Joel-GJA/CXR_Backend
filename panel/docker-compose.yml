@@ -1,0 +1,49 @@
+version: "3.9"
+
+# Self-hosted Supabase stack for Nareen Panel Phase 3
+# Usage:
+#   docker compose up -d
+#   Then set these env vars in your shell or .env:
+#     SUPABASE_URL=http://localhost:54321
+#     SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key from supabase/config.toml>
+#
+# OR for plain PostgreSQL only:
+#   docker compose up -d db
+#   Set: DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cxr
+
+services:
+
+  # ── PostgreSQL (Supabase uses this underneath) ─────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB:       cxr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+
+  # ── pgAdmin (optional web GUI) ─────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@cxr.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - db
+    profiles:
+      - tools
+
+  # ── Supabase Studio (optional — full Supabase requires supabase CLI) ───────
+  # For full self-hosted Supabase run: npx supabase start
+  # See: https://supabase.com/docs/guides/self-hosting/docker
+
+volumes:
+  pgdata:

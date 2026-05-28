@@ -1,0 +1,20 @@
+{
+  "name": "nareen-panel-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nareen Phase 3 — All-in-one Ops Panel + Host Manager backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "node server.js"
+  },
+  "dependencies": {
+    "cors":    "^2.8.5",
+    "express": "^4.19.2",
+    "ws":      "^8.16.0"
+  },
+  "optionalDependencies": {
+    "@supabase/supabase-js": "^2.43.1",
+    "pg":                    "^8.11.5"
+  }
+}

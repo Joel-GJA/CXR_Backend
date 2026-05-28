@@ -1,0 +1,61 @@
+async function fetchJson(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || err.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Host Manager (now built into the panel — direct routes) ──────────────────
+export const hm = {
+  health:          ()     => fetchJson('/health'),
+  state:           ()     => fetchJson('/api/state'),
+  builds:          ()     => fetchJson('/builds'),
+  telemetry:       ()     => fetchJson('/api/telemetry'),
+  requestActivity: ()     => fetchJson('/api/request-activity'),
+
+  // Rooms
+  listRooms:   ()         => fetchJson('/rooms'),
+  createRoom:  (body)     => fetchJson('/rooms',                 { method: 'POST',   body: JSON.stringify(body) }),
+  stopRoom:    (id)       => fetchJson(`/rooms/${id}/stop`,     { method: 'POST'   }),
+  restartRoom: (id)       => fetchJson(`/rooms/${id}/restart`,  { method: 'POST'   }),
+  roomLogs:    (id)       => fetchJson(`/api/logs/rooms/${id}`),
+
+  // Services
+  listServices:   ()      => fetchJson('/services'),
+  startService:   (body)  => fetchJson('/services',              { method: 'POST',   body: JSON.stringify(body) }),
+  stopService:    (id)    => fetchJson(`/services/${id}/stop`,  { method: 'POST'   }),
+  restartService: (id)    => fetchJson(`/services/${id}/restart`,{ method: 'POST'   }),
+  deleteService:  (id)    => fetchJson(`/services/${id}`,       { method: 'DELETE' }),
+  serviceLogs:    (id)    => fetchJson(`/api/logs/services/${id}`),
+
+  // Registry control
+  registryStatus:  ()     => fetchJson('/api/registry/status'),
+  startRegistry:   ()     => fetchJson('/api/registry/start',   { method: 'POST'   }),
+  stopRegistry:    ()     => fetchJson('/api/registry/stop',    { method: 'POST'   }),
+  restartRegistry: ()     => fetchJson('/api/registry/restart', { method: 'POST'   }),
+
+  // Registry state (data from registry service)
+  registryState:       ()  => fetchJson('/api/registry-state'),
+  orphanRooms:         ()  => fetchJson('/api/registry-orphans'),
+  deleteRegistryRoom:  (id)=> fetchJson(`/api/registry/rooms/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // Logs
+  hostLogs: () => fetchJson('/api/logs/host-manager'),
+};
+
+// ── Nareen's Event Persistence ───────────────────────────────────────────────
+export const events = {
+  list:  (params = {})  => {
+    const qs = new URLSearchParams(params).toString();
+    return fetchJson(`/api/events${qs ? '?' + qs : ''}`);
+  },
+  write: (event)        => fetchJson('/api/events', { method: 'POST', body: JSON.stringify(event) }),
+  writeMany: (evts)     => fetchJson('/api/events', { method: 'POST', body: JSON.stringify(evts) }),
+  stats: ()             => fetchJson('/api/events/stats'),
+  replay: (sessionId)   => fetchJson(`/api/events/replay/${encodeURIComponent(sessionId)}`),
+};
