@@ -48,7 +48,7 @@ const itemVariant = {
   visible: (i) => ({ opacity: 1, x: 0, transition: { delay: i * 0.04, duration: 0.24, ease: 'easeOut' } }),
 };
 
-function NavItem({ to, icon: Icon, label, tag, idx, collapsed }) {
+function NavItem({ to, icon: Icon, label, tag, idx, collapsed, isDark }) {
   return (
     <motion.div custom={idx} variants={itemVariant} initial="hidden" animate="visible">
       <NavLink
@@ -59,7 +59,9 @@ function NavItem({ to, icon: Icon, label, tag, idx, collapsed }) {
           collapsed && 'justify-center px-0 py-2.5',
           isActive
             ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-            : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border-transparent',
+            : isDark
+              ? 'text-slate-400 hover:text-white hover:bg-white/[0.05] border-transparent'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent',
         )}
       >
         {({ isActive }) => (
@@ -70,7 +72,7 @@ function NavItem({ to, icon: Icon, label, tag, idx, collapsed }) {
                 className="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-400 rounded-full shadow-[0_0_8px_#60a5fa66]"
               />
             )}
-            <Icon className={cn('w-[16px] h-[16px] flex-shrink-0 transition-colors', isActive ? 'text-blue-400' : 'group-hover:text-white')} />
+            <Icon className={cn('w-[16px] h-[16px] flex-shrink-0 transition-colors', isActive ? 'text-blue-400' : isDark ? 'group-hover:text-white' : 'group-hover:text-slate-900')} />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span
@@ -128,7 +130,7 @@ export default function Layout({ children }) {
           'relative z-20 flex flex-col flex-shrink-0 overflow-hidden',
           isDark
             ? 'bg-[#04080f] border-r border-white/[0.06]'
-            : 'bg-slate-900 border-r border-slate-700',
+            : 'bg-white border-r border-slate-200',
         )}
       >
         {isDark && (
@@ -137,7 +139,8 @@ export default function Layout({ children }) {
 
         {/* Brand header */}
         <div className={cn(
-          'relative border-b border-white/[0.06] min-h-[60px]',
+          'relative min-h-[60px] border-b',
+          isDark ? 'border-white/[0.06]' : 'border-slate-200',
           collapsed
             ? 'flex flex-col items-center justify-center gap-1.5 py-3'
             : 'flex items-center gap-2.5 px-3 py-3',
@@ -161,7 +164,10 @@ export default function Layout({ children }) {
                 initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.16 }} className="flex-1 overflow-hidden min-w-0"
               >
-                <div className="text-[13px] font-bold text-white leading-tight whitespace-nowrap">CXR Backend Panel</div>
+                <div className={cn(
+                  'text-[13px] font-bold leading-tight whitespace-nowrap',
+                  isDark ? 'text-white' : 'text-slate-900',
+                )}>CXR Backend Panel</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -212,16 +218,19 @@ export default function Layout({ children }) {
                   {!collapsed && (
                     <motion.div
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="text-[9.5px] font-bold text-slate-600 uppercase tracking-[0.13em] px-3 pb-1.5"
+                      className={cn(
+                        'text-[9.5px] font-bold uppercase tracking-[0.13em] px-3 pb-1.5',
+                        isDark ? 'text-slate-600' : 'text-slate-400',
+                      )}
                     >
                       {group.label}
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {collapsed && <div className="my-1 mx-3 h-px bg-white/[0.06]" />}
+                {collapsed && <div className={cn('my-1 mx-3 h-px', isDark ? 'bg-white/[0.06]' : 'bg-slate-200')} />}
                 <div className="space-y-0.5">
                   {items.map(item => (
-                    <NavItem key={item.to} {...item} idx={globalIdx++} collapsed={collapsed} />
+                    <NavItem key={item.to} {...item} idx={globalIdx++} collapsed={collapsed} isDark={isDark} />
                   ))}
                 </div>
               </div>
@@ -230,15 +239,24 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-white/[0.06] p-2 space-y-1">
+        <div className={cn(
+          'border-t p-2 space-y-1',
+          isDark ? 'border-white/[0.06]' : 'border-slate-200',
+        )}>
 
           {/* User card */}
           {user && !collapsed && (
-            <div className="rounded-lg border border-white/[0.07] bg-white/[0.025] overflow-hidden mb-1">
+            <div className={cn(
+              'rounded-lg border overflow-hidden mb-1',
+              isDark ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50',
+            )}>
               <div className="flex items-center gap-2.5 px-3 pt-3 pb-2.5">
                 <Avatar fallback={user.username[0]} badge={true} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-semibold text-white truncate">{user.username}</div>
+                  <div className={cn(
+                    'text-[12px] font-semibold truncate',
+                    isDark ? 'text-white' : 'text-slate-900',
+                  )}>{user.username}</div>
                   <Badge
                     variant={user.role === 'admin' ? 'default' : user.role === 'operator' ? 'success' : 'warning'}
                     className="mt-0.5 text-[9px] px-1.5 py-0"
@@ -250,7 +268,10 @@ export default function Layout({ children }) {
               <motion.button
                 whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
                 onClick={logout}
-                className="flex items-center justify-center gap-2 w-full px-3 py-2 text-[11px] font-semibold text-red-400 hover:bg-red-500/10 border-t border-white/[0.05] transition-all"
+                className={cn(
+                  'flex items-center justify-center gap-2 w-full px-3 py-2 text-[11px] font-semibold text-red-400 hover:bg-red-500/10 border-t transition-all',
+                  isDark ? 'border-white/[0.05]' : 'border-slate-200',
+                )}
               >
                 <LogOut className="w-3 h-3" /> Sign out
               </motion.button>
@@ -268,27 +289,27 @@ export default function Layout({ children }) {
               <LogOut className="w-3.5 h-3.5" />
             </motion.button>
           )}
-
-          {/* Theme toggle — animated view-transition reveal */}
-          <AnimatedThemeToggler
-            variant="circle"
-            duration={500}
-            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className={cn(
-              'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] text-slate-500 hover:text-slate-200 hover:bg-white/[0.05] transition-all',
-              collapsed && 'justify-center px-0',
-            )}
-          >
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="whitespace-nowrap">
-                  {isDark ? 'Light Mode' : 'Dark Mode'}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </AnimatedThemeToggler>
         </div>
       </motion.aside>
+
+      {/* Floating theme toggle — top-left of viewport, just right of sidebar */}
+      <motion.div
+        animate={{ left: collapsed ? 72 : 252 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+        className="fixed top-3 z-40"
+      >
+        <AnimatedThemeToggler
+          variant="circle"
+          duration={500}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className={cn(
+            'flex items-center justify-center w-9 h-9 rounded-full border shadow-lg transition-colors backdrop-blur-md',
+            isDark
+              ? 'bg-[#0a1120]/90 border-white/10 hover:bg-white/[0.08]'
+              : 'bg-white/95 border-slate-200 hover:bg-slate-100 shadow-slate-300/30',
+          )}
+        />
+      </motion.div>
 
       {/* Main content */}
       <main className="relative z-10 flex-1 overflow-y-auto">

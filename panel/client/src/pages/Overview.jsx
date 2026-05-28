@@ -390,19 +390,19 @@ export default function Overview() {
       )}
 
       {/* Tech-stack ticker — scrolls horizontally, speeds up on scroll */}
-      <div className="mt-10 -mx-8 border-t border-white/[0.04] pt-6 select-none">
+      <div className="mt-10 -mx-8 border-t border-slate-300/20 dark:border-white/[0.04] pt-6 select-none">
         <ScrollVelocityContainer>
           <ScrollVelocityRow baseVelocity={4} direction={1}>
             {['Unity', 'Mirror', 'WebSocket', 'Express', 'Node.js', 'React', 'Vite', 'Tailwind', 'Supabase', 'PostgreSQL'].map((tech, i) => (
-              <span key={`${tech}-${i}`} className="mx-6 inline-flex items-center gap-2 text-2xl font-extrabold text-white/10 hover:text-cyan-400/40 transition-colors">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/40" />
+              <span key={`${tech}-${i}`} className="mx-6 inline-flex items-center gap-2 text-2xl font-extrabold text-slate-300/40 dark:text-white/10 hover:text-cyan-500/60 transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
                 {tech}
               </span>
             ))}
           </ScrollVelocityRow>
           <ScrollVelocityRow baseVelocity={3} direction={-1} className="mt-2">
             {['XR Multiplayer', 'Headless Server', 'Real-time Sync', 'Calibration', 'Ownership', 'Phase 3', 'CXR_Backend'].map((label, i) => (
-              <span key={`${label}-${i}`} className="mx-6 inline-block text-xl font-bold text-blue-500/10 tracking-wider uppercase">
+              <span key={`${label}-${i}`} className="mx-6 inline-block text-xl font-bold text-blue-400/30 dark:text-blue-500/10 tracking-wider uppercase">
                 {label}
               </span>
             ))}

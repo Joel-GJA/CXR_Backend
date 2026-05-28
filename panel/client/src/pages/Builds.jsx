@@ -5,6 +5,7 @@ import {
   CheckCircle2, AlertCircle, Package, HardDrive, X,
 } from 'lucide-react';
 import { buildsApi } from '../api/client.js';
+import { FileUpload } from '../components/ui/file-upload.jsx';
 import { cn } from '../lib/utils.js';
 
 const page = {
@@ -108,12 +109,10 @@ function BuildCard({ build, onDelete }) {
 export default function Builds() {
   const [builds,    setBuilds]    = useState([]);
   const [buildsDir, setBuildsDir] = useState('');
-  const [dragging,  setDragging]  = useState(false);
   const [file,      setFile]      = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress,  setProgress]  = useState(0);
   const [toasts,    setToasts]    = useState([]);
-  const inputRef = useRef(null);
   let toastId = useRef(0);
 
   const toast = (msg, type = 'success') => {
@@ -134,13 +133,6 @@ export default function Builds() {
   }, []);
 
   useEffect(() => { loadBuilds(); }, [loadBuilds]);
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
-  };
 
   const handleUpload = async () => {
     if (!file || uploading) return;
@@ -190,65 +182,17 @@ export default function Builds() {
         )}
       </div>
 
-      {/* Drop zone */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => !file && inputRef.current?.click()}
-        className={cn(
-          'relative rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer mb-6 overflow-hidden',
-          dragging
-            ? 'border-blue-400 bg-blue-500/10 scale-[1.01]'
-            : file
-              ? 'border-emerald-500/40 bg-emerald-500/5 cursor-default'
-              : 'border-white/10 bg-white/[0.02] hover:border-blue-500/30 hover:bg-blue-500/5',
-        )}
-      >
-        <input
-          ref={inputRef}
-          type="file"
+      {/* Aceternity-style drop zone */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <FileUpload
           accept={ACCEPTED}
-          className="hidden"
-          onChange={(e) => e.target.files[0] && setFile(e.target.files[0])}
+          file={file}
+          onChange={setFile}
+          onClear={() => setFile(null)}
         />
-
-        <div className="flex flex-col items-center justify-center py-14 px-6 gap-4">
-          <motion.div
-            animate={dragging ? { scale: 1.15, rotate: -6 } : { scale: 1, rotate: 0 }}
-            className={cn(
-              'w-16 h-16 rounded-2xl flex items-center justify-center',
-              file ? 'bg-emerald-500/10' : 'bg-blue-500/10',
-            )}
-          >
-            {file
-              ? <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-              : <UploadCloud  className="w-8 h-8 text-blue-400" />
-            }
-          </motion.div>
-
-          {file ? (
-            <div className="text-center">
-              <div className="text-base font-semibold text-white">{file.name}</div>
-              <div className="text-sm text-slate-400 mt-1">{(file.size / 1024 / 1024).toFixed(1)} MB</div>
-            </div>
-          ) : (
-            <div className="text-center">
-              <div className="text-base font-semibold text-white">
-                {dragging ? 'Drop it!' : 'Drag & drop your build archive here'}
-              </div>
-              <div className="text-sm text-slate-500 mt-1">
-                or click to browse · supports <span className="text-blue-400">.zip  .rar  .tar.gz  .tar</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Shimmer on drag */}
-        {dragging && (
-          <div className="absolute inset-0 bg-blue-shimmer bg-[length:200%] animate-shimmer pointer-events-none opacity-40" />
-        )}
+        <p className="text-[11px] text-center text-slate-500 mt-3">
+          Supports <span className="text-blue-400">.zip · .rar · .tar.gz · .tar</span>
+        </p>
       </motion.div>
 
       {/* Action row */}
