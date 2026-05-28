@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Boxes, Activity, Database, Package, ArrowRight, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Boxes, Activity, Database, Package, ArrowRight, RefreshCw, Wifi, WifiOff, TrendingUp } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell, AreaChart, Area,
+} from 'recharts';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { hm, events } from '../api/client.js';
 import { cn } from '../lib/utils.js';
@@ -45,7 +49,7 @@ function StatCard({ label, value, sub, icon: Icon, color = 'blue', to }) {
       <div className="p-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{label}</div>
-          <div className="text-3xl font-extrabold tabular-nums text-white dark:text-white light:text-slate-900 tracking-tight leading-none">
+          <div className="text-3xl font-extrabold tabular-nums text-white tracking-tight leading-none">
             {display}
           </div>
           <div className="text-xs text-slate-500 mt-1.5 truncate">{sub}</div>
@@ -62,6 +66,18 @@ function StatCard({ label, value, sub, icon: Icon, color = 'blue', to }) {
     </motion.div>
   );
 }
+
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0a1120] border border-blue-500/20 rounded-lg px-3 py-2 text-xs shadow-xl">
+      <p className="text-slate-400 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }} className="font-bold">{p.name}: {p.value}</p>
+      ))}
+    </div>
+  );
+};
 
 export default function Overview() {
   const [state, setState]           = useState(null);
@@ -86,6 +102,26 @@ export default function Overview() {
 
   const rooms   = state?.rooms || [];
   const running = rooms.filter(r => r.status === 'running').length;
+
+  const eventChartData = (evtStats?.byType || [])
+    .slice(0, 8)
+    .map(item => ({
+      name: (item.event_type || '').replace(/([A-Z])/g, ' $1').trim(),
+      count: parseInt(item.count) || 0,
+    }));
+
+  const roomPieData = rooms.length > 0
+    ? [
+        { name: 'Running', value: running },
+        { name: 'Idle',    value: Math.max(0, rooms.length - running) },
+      ]
+    : [{ name: 'No Rooms', value: 1 }];
+
+  const roomPlayerData = rooms.slice(0, 6).map(r => ({
+    name: (r.requestedName || r.roomId || '').slice(0, 10),
+    players: r.playerCount ?? 0,
+    max: r.maxParticipants ?? 0,
+  }));
 
   return (
     <motion.div variants={page} initial="initial" animate="animate" exit="exit" className="p-8 max-w-7xl mx-auto">
@@ -118,15 +154,130 @@ export default function Overview() {
       <motion.div variants={stagger} initial="initial" animate="animate"
         className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
       >
-        <StatCard label="Active Rooms"     value={running}                    sub={`${rooms.length} total created`} icon={Boxes}    color="green"  to="/rooms" />
-        <StatCard label="Registry Rooms"   value={registry?.rooms?.length ?? 0} sub={registry?.ok ? 'registry online' : 'registry offline'} icon={Wifi} color="blue" to="/hostmanager" />
-        <StatCard label="Stored Events"    value={evtStats?.total ?? 0}       sub={evtStats?.backend ?? 'initializing'} icon={Database} color="purple" to="/events" />
-        <StatCard label="Unity Builds"     value={Object.keys(state?.builds || {}).length} sub="available builds" icon={Package} color="yellow" to="/hostmanager" />
+        <StatCard label="Active Rooms"     value={running}                      sub={`${rooms.length} total created`}                                   icon={Boxes}    color="green"  to="/rooms" />
+        <StatCard label="Registry Rooms"   value={registry?.rooms?.length ?? 0} sub={registry?.ok ? 'registry online' : 'registry offline'}             icon={Wifi}     color="blue"   to="/hostmanager" />
+        <StatCard label="Stored Events"    value={evtStats?.total ?? 0}         sub={evtStats?.backend ?? 'initializing'}                               icon={Database} color="purple" to="/events" />
+        <StatCard label="Unity Builds"     value={Object.keys(state?.builds || {}).length} sub="available builds"                                       icon={Package}  color="yellow" to="/hostmanager" />
       </motion.div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        {/* Event type bar chart */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="glass lg:col-span-2"
+        >
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-semibold text-white">Event Distribution</span>
+            {evtStats?.total > 0 && (
+              <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                {evtStats.total} total
+              </span>
+            )}
+          </div>
+          <div className="p-5">
+            {eventChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={eventChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#475569', fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                  <Bar dataKey="count" name="Events" radius={[4, 4, 0, 0]}
+                    fill="url(#barGradient)"
+                  />
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.6} />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[180px] flex items-center justify-center text-slate-600 text-sm">
+                No event data yet
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Room status donut */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="glass"
+        >
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <Boxes className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm font-semibold text-white">Room Status</span>
+          </div>
+          <div className="p-5 flex flex-col items-center">
+            <div className="relative">
+              <ResponsiveContainer width={150} height={150}>
+                <PieChart>
+                  <Pie
+                    data={roomPieData}
+                    cx="50%" cy="50%"
+                    innerRadius={44} outerRadius={65}
+                    startAngle={90} endAngle={-270}
+                    paddingAngle={2}
+                    dataKey="value"
+                    strokeWidth={0}
+                  >
+                    {roomPieData.map((entry, index) => (
+                      <Cell key={index} fill={
+                        entry.name === 'Running'  ? '#10b981' :
+                        entry.name === 'Idle'     ? '#1e293b' :
+                        '#1e293b'
+                      } />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-extrabold text-white tabular-nums">{running}</span>
+                <span className="text-[10px] text-slate-500">running</span>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Running ({running})
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-slate-700" /> Idle ({Math.max(0, rooms.length - running)})
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Room capacity area chart (only if rooms exist) */}
+      {roomPlayerData.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass mb-6">
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <Activity className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-semibold text-white">Room Capacity</span>
+            <span className="text-[10px] text-slate-500 ml-1">players / max slots</span>
+          </div>
+          <div className="p-5">
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={roomPlayerData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(59,130,246,0.06)' }} />
+                <Bar dataKey="max"     name="Max"     radius={[3, 3, 0, 0]} fill="rgba(59,130,246,0.15)" />
+                <Bar dataKey="players" name="Players" radius={[3, 3, 0, 0]} fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Running rooms */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass">
           <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Boxes className="w-4 h-4 text-blue-400" />
@@ -167,7 +318,7 @@ export default function Overview() {
         </motion.div>
 
         {/* Connection info */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass">
           <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
             <Wifi className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-semibold text-white">Connection Info</span>
@@ -192,7 +343,7 @@ export default function Overview() {
 
       {/* Event stats */}
       {evtStats && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }} className="glass">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="glass">
           <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-purple-400" />

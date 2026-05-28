@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Send, History, Filter, RefreshCw, Database, Zap } from 'lucide-react';
+import { Activity, Send, History, Filter, RefreshCw, Database, Zap, BarChart2 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
+} from 'recharts';
 import { events } from '../api/client.js';
 import { cn } from '../lib/utils.js';
 
@@ -13,6 +16,18 @@ const EVENT_TYPES = [
   'CalibrationStarted','CalibrationCompleted',
   'SessionStarted','SessionEnded','ServerStarted','ServerStopped',
 ];
+
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0a1120] border border-blue-500/20 rounded-lg px-3 py-2 text-xs shadow-xl">
+      <p className="text-slate-400 mb-0.5">{label}</p>
+      <p className="font-bold text-purple-400">{payload[0]?.value} events</p>
+    </div>
+  );
+};
+
+const BAR_COLORS = ['#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899'];
 
 function evtColor(type) {
   if (!type) return 'text-slate-500';
@@ -100,6 +115,42 @@ export default function Events() {
         </h1>
         <p className="text-sm text-slate-500 mt-1">Phase 3 persistence pipeline — PostgreSQL + JSONL fallback</p>
       </div>
+
+      {/* Event distribution chart */}
+      {stats && (stats.byType || []).length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass mb-6">
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <BarChart2 className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-semibold text-white">Event Type Distribution</span>
+            <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+              {stats.total} total
+            </span>
+          </div>
+          <div className="p-5">
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart
+                data={(stats.byType || []).slice(0, 10).map((item, i) => ({
+                  name: (item.event_type || '').replace(/([A-Z])/g, ' $1').trim(),
+                  count: parseInt(item.count) || 0,
+                  color: BAR_COLORS[i % BAR_COLORS.length],
+                }))}
+                layout="vertical"
+                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#475569', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} width={110} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(139,92,246,0.06)' }} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {(stats.byType || []).slice(0, 10).map((_, i) => (
+                    <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} fillOpacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats */}
       {stats && (

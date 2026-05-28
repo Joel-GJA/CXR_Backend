@@ -41,6 +41,7 @@ export const hm = {
   restartRoom: (id)       => fetchJson(`/rooms/${id}/restart`,   { method: 'POST'   }),
   roomLogs:    (id)       => fetchJson(`/api/logs/rooms/${id}`),
 
+  templates:      ()      => fetchJson('/templates'),
   listServices:   ()      => fetchJson('/services'),
   startService:   (body)  => fetchJson('/services',               { method: 'POST',   body: JSON.stringify(body) }),
   stopService:    (id)    => fetchJson(`/services/${id}/stop`,   { method: 'POST'   }),
