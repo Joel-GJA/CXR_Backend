@@ -5,6 +5,7 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, AlertDialogMedia } from '../components/ui/alert-dialog.jsx';
 import { useAlert } from '../contexts/AlertContext.jsx';
 import { hm } from '../api/client.js';
+import { useRealtime } from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 const page    = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
@@ -43,6 +44,7 @@ function KVRow({ label, value }) {
 
 export default function HostManager() {
   const { warn, success: alertSuccess, alert: alertError } = useAlert();
+  const { subscribe } = useRealtime();
   const [health,    setHealth]    = useState(null);
   const [regStatus, setRegStatus] = useState(null);
   const [regState,  setRegState]  = useState(null);
@@ -64,7 +66,19 @@ export default function HostManager() {
     if (sv.status  === 'fulfilled') setServices(sv.value.services || []);
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(load, 4000); return () => clearInterval(t); }, [load]);
+  // Real-time: instant service/registry/room updates via WebSocket state events
+  useEffect(() => subscribe('state', msg => {
+    if (msg.services !== undefined) setServices(msg.services);
+    if (msg.registryRunning !== undefined) {
+      setRegStatus(prev => prev ? { ...prev, running: msg.registryRunning } : { running: msg.registryRunning });
+    }
+    if (msg.rooms !== undefined) {
+      // Update health room count from live state
+      setHealth(prev => prev ? { ...prev, roomCount: msg.roomCount, serviceCount: msg.serviceCount } : prev);
+    }
+  }), [subscribe]);
+
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
 
   async function doReg(action) {
     setBusy(b => ({ ...b, reg: action }));
@@ -72,9 +86,14 @@ export default function HostManager() {
       if (action === 'start')   await hm.startRegistry();
       if (action === 'stop')    await hm.stopRegistry();
       if (action === 'restart') await hm.restartRegistry();
-      showToast(`Registry ${action}ed successfully`, 'success');
-      alertSuccess(`Registry ${action}ed successfully`);
-      setTimeout(load, 800);
+      showToast(`Registry ${action}ed`, 'success');
+      alertSuccess(`Registry ${action}ed`);
+      // Poll every second for 6s so the UI reflects the new state quickly
+      let ticks = 0;
+      const poll = setInterval(async () => {
+        await load();
+        if (++ticks >= 6) clearInterval(poll);
+      }, 1000);
     } catch (e) { showToast(e.message, 'error'); alertError(e.message); }
     finally { setBusy(b => ({ ...b, reg: null })); }
   }

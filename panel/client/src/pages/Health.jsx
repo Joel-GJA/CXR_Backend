@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { HeartPulse, Server, Radio, Globe, Activity } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { hm } from '../api/client.js';
+import { useRealtime } from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
@@ -29,6 +30,7 @@ function Section({ title, icon: Icon, iconColor = 'text-blue-400', children, del
 }
 
 export default function Health() {
+  const { subscribe } = useRealtime();
   const [health,    setHealth]    = useState(null);
   const [state,     setState]     = useState(null);
   const [registry,  setRegistry]  = useState(null);
@@ -48,7 +50,14 @@ export default function Health() {
     if (hl.status  === 'fulfilled') setHostLogs(hl.value.text || '');
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
+  // Real-time: update room/service counts from live WS state
+  useEffect(() => subscribe('state', msg => {
+    setHealth(prev => prev ? { ...prev, roomCount: msg.roomCount, serviceCount: msg.serviceCount } : prev);
+    if (msg.services) setTelemetry(prev => prev ? { ...prev, services: msg.services } : prev);
+  }), [subscribe]);
+
+  // Poll less often — WS handles live updates; poll for registry state (external HTTP)
+  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, [load]);
 
   const hints = state?.connectionHints;
 

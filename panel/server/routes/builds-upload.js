@@ -6,6 +6,8 @@ const { exec } = require('child_process');
 const config   = require('../config');
 
 const router = express.Router();
+let _roomManager = null;
+router.setRoomManager = (rm) => { _roomManager = rm; };
 
 const tmpDir = path.resolve(__dirname, '../tmp-uploads');
 fs.mkdirSync(tmpDir, { recursive: true });
@@ -87,6 +89,7 @@ router.post('/upload', upload.single('build'), async (req, res) => {
 
     // Refresh the live build registry so new build is immediately available
     const freshBuilds = config.rescanBuilds();
+    if (_roomManager) _roomManager.refreshBuilds(freshBuilds);
     const normalizedId = buildName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
     const registered = !!freshBuilds[normalizedId];
 
@@ -132,7 +135,8 @@ router.delete('/:name', (req, res) => {
   }
   try {
     fs.rmSync(dir, { recursive: true, force: true });
-    config.rescanBuilds();
+    const freshBuilds = config.rescanBuilds();
+    if (_roomManager) _roomManager.refreshBuilds(freshBuilds);
     res.json({ ok: true, message: `Build "${name}" deleted.` });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

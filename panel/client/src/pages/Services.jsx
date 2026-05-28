@@ -4,6 +4,7 @@ import { Server, Play, Square, RotateCcw, Trash2, FileText, RefreshCw } from 'lu
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogTerminal from '../components/LogTerminal.jsx';
 import { hm } from '../api/client.js';
+import { useRealtime } from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
@@ -21,14 +22,19 @@ function Btn({ onClick, disabled, loading, icon: Icon, children, variant = 'defa
 }
 
 function uptime(svc) {
-  if (!svc.startedAt) return '—';
-  const sec = Math.floor((Date.now() - new Date(svc.startedAt).getTime()) / 1000);
+  if (!svc.startedAtUtc) return '—';
+  const sec = Math.floor((Date.now() - new Date(svc.startedAtUtc).getTime()) / 1000);
   if (sec < 60)   return `${sec}s`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
 }
 
+function svcName(svc) {
+  return svc.label || svc.templateName || svc.serviceId || '—';
+}
+
 export default function Services() {
+  const { subscribe } = useRealtime();
   const [services,  setServices]  = useState([]);
   const [templates, setTemplates] = useState([]);
   const [svcLogs,   setSvcLogs]   = useState({});
@@ -46,7 +52,12 @@ export default function Services() {
     }
   }, [template]);
 
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [load]);
+  // Real-time: instant service status updates via WebSocket
+  useEffect(() => subscribe('state', msg => {
+    if (msg.services) setServices(msg.services);
+  }), [subscribe]);
+
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
 
   async function startService() {
     if (!template) return;
@@ -56,9 +67,9 @@ export default function Services() {
     finally { setBusy(b => ({ ...b, start: false })); }
   }
 
-  async function stopSvc(id)    { act(id, 'stop',    () => hm.stopService(id),    'Stopped'); }
-  async function restartSvc(id) { act(id, 'restart', () => hm.restartService(id), 'Restarted'); }
-  async function deleteSvc(id)  { act(id, 'delete',  () => hm.deleteService(id),  'Removed'); }
+  async function stopSvc(id)    { act(id, 'stop',    () => hm.stopService(id),    'Service stopped'); }
+  async function restartSvc(id) { act(id, 'restart', () => hm.restartService(id), 'Service restarted'); }
+  async function deleteSvc(id)  { act(id, 'delete',  () => hm.deleteService(id),  'Service removed'); }
 
   async function act(id, key, fn, msg) {
     setBusy(b => ({ ...b, [id]: key }));
@@ -67,8 +78,8 @@ export default function Services() {
     finally { setBusy(b => ({ ...b, [id]: null })); }
   }
 
-  async function loadLogs(id) {
-    try { const logs = await hm.serviceLogs(id); setSvcLogs(p => ({ ...p, [id]: logs })); }
+  async function loadLogs(serviceId) {
+    try { const logs = await hm.serviceLogs(serviceId); setSvcLogs(p => ({ ...p, [serviceId]: logs })); }
     catch (e) { flash(e.message, 'error'); }
   }
 
@@ -134,41 +145,46 @@ export default function Services() {
           ) : (
             <div className="space-y-3">
               <AnimatePresence>
-                {services.map((svc, i) => (
-                  <motion.div key={svc.id || svc.serviceId}
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-blue-500/10 transition-colors overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between p-4 flex-wrap gap-3">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <StatusBadge status={svc.status} />
-                        <div>
-                          <div className="text-sm font-bold text-white">{svc.name || svc.id}</div>
-                          <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                            PID: {svc.pid || '—'} · Uptime: {uptime(svc)}{svc.restartCount > 0 ? ` · Restarts: ${svc.restartCount}` : ''}
+                {services.map((svc, i) => {
+                  const id      = svc.serviceId;
+                  const name    = svcName(svc);
+                  const active  = svc.status === 'running' || svc.status === 'starting' || svc.status === 'stopping';
+                  return (
+                    <motion.div key={id}
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-blue-500/10 transition-colors overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between p-4 flex-wrap gap-3">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <StatusBadge status={svc.status} />
+                          <div>
+                            <div className="text-sm font-bold text-white">{name}</div>
+                            <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                              {id} · PID: {svc.pid || '—'} · Uptime: {uptime(svc)}{svc.restartCount > 0 ? ` · Restarts: ${svc.restartCount}` : ''}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {active && <Btn onClick={() => restartSvc(id)} loading={busy[id] === 'restart'} icon={RotateCcw} sm>Restart</Btn>}
+                          {active && <Btn onClick={() => stopSvc(id)}    loading={busy[id] === 'stop'}    icon={Square}    sm variant="danger">Stop</Btn>}
+                          {!active && <Btn onClick={() => deleteSvc(id)} loading={busy[id] === 'delete'}  icon={Trash2}    sm variant="danger">Remove</Btn>}
+                          <Btn onClick={() => svcLogs[id] ? setSvcLogs(p => { const n={...p}; delete n[id]; return n; }) : loadLogs(id)} icon={FileText} sm>
+                            {svcLogs[id] ? 'Hide' : 'Logs'}
+                          </Btn>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Btn onClick={() => restartSvc(svc.id)} loading={busy[svc.id] === 'restart'} icon={RotateCcw} sm>Restart</Btn>
-                        <Btn onClick={() => stopSvc(svc.id)}    loading={busy[svc.id] === 'stop'}    icon={Square}    sm variant="danger">Stop</Btn>
-                        <Btn onClick={() => deleteSvc(svc.id)}  loading={busy[svc.id] === 'delete'}  icon={Trash2}    sm variant="danger">Remove</Btn>
-                        <Btn onClick={() => svcLogs[svc.id] ? setSvcLogs(p => { const n={...p}; delete n[svc.id]; return n; }) : loadLogs(svc.id)} icon={FileText} sm>
-                          {svcLogs[svc.id] ? 'Hide' : 'Logs'}
-                        </Btn>
-                      </div>
-                    </div>
-                    <AnimatePresence>
-                      {svcLogs[svc.id] && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden px-4 pb-4">
-                          <LogTerminal lines={(svcLogs[svc.id].stdout || '').split('\n').filter(Boolean)} height="sm" label={`${svc.name || svc.id} · stdout`} />
-                          {svcLogs[svc.id].stderr && <div className="mt-2"><LogTerminal lines={(svcLogs[svc.id].stderr || '').split('\n').filter(Boolean)} height="sm" label="stderr" /></div>}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                ))}
+                      <AnimatePresence>
+                        {svcLogs[id] && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden px-4 pb-4">
+                            <LogTerminal lines={(svcLogs[id].stdout || '').split('\n').filter(Boolean)} height="sm" label={`${name} · stdout`} />
+                            {svcLogs[id].stderr && <div className="mt-2"><LogTerminal lines={(svcLogs[id].stderr || '').split('\n').filter(Boolean)} height="sm" label="stderr" /></div>}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           )}

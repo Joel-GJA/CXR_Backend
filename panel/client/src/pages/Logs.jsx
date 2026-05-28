@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Terminal, Pause, Play, Trash2, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { useRealtime } from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 const MAX_LINES = 1000;
@@ -15,50 +16,37 @@ function lineColor(t) {
 }
 
 export default function Logs() {
-  const [lines,          setLines]          = useState([]);
-  const [paused,         setPaused]         = useState(false);
-  const [wsStatus,       setWsStatus]       = useState('Connecting...');
-  const [wsConnected,    setWsConnected]    = useState(false);
-  const [serviceFilter,  setServiceFilter]  = useState('');
-  const [streamFilter,   setStreamFilter]   = useState('');
-  const [search,         setSearch]         = useState('');
+  const { subscribe, connected, reconnect } = useRealtime();
+  const [lines,         setLines]         = useState([]);
+  const [paused,        setPaused]        = useState(false);
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [streamFilter,  setStreamFilter]  = useState('');
+  const [search,        setSearch]        = useState('');
   const termRef  = useRef(null);
-  const wsRef    = useRef(null);
   const pauseRef = useRef(false);
   pauseRef.current = paused;
 
-  const connect = useCallback(() => {
-    if (wsRef.current) wsRef.current.close();
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${window.location.host}/logs`);
-    wsRef.current = ws;
-    ws.onopen  = () => { setWsStatus('Connected'); setWsConnected(true); };
-    ws.onclose = () => { setWsStatus('Disconnected — reconnecting in 3s…'); setWsConnected(false); setTimeout(connect, 3000); };
-    ws.onerror = () => setWsStatus('WebSocket error');
-    ws.onmessage = (evt) => {
-      if (pauseRef.current) return;
-      try {
-        const msg = JSON.parse(evt.data);
-        if (msg.type === 'ws-status') { setWsStatus(`Connected to ${msg.host}`); return; }
-        if (msg.type === 'ws-error')  { setWsStatus(`WS error: ${msg.message}`); return; }
-        const service = msg.serviceId || msg.roomId || msg.source || 'system';
-        const stream  = msg.stream || 'stdout';
-        const text    = msg.text || msg.message || msg.line || JSON.stringify(msg);
-        setLines(prev => { const next = [...prev, `[${service}] [${stream}] ${text}`]; return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next; });
-      } catch {
-        setLines(prev => { const next = [...prev, evt.data]; return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next; });
-      }
-    };
-  }, []);
+  // Subscribe to log events from the shared WebSocket
+  useEffect(() => subscribe('log', msg => {
+    if (pauseRef.current) return;
+    const service = msg.serviceId || msg.roomId || msg.source || 'system';
+    const stream  = msg.stream || 'stdout';
+    const text    = msg.data || msg.text || msg.message || JSON.stringify(msg);
+    setLines(prev => {
+      const next = [...prev, `[${service}] [${stream}] ${text.trimEnd()}`];
+      return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
+    });
+  }), [subscribe]);
 
-  useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
-  useEffect(() => { if (!paused && termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight; }, [lines, paused]);
+  useEffect(() => {
+    if (!paused && termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
+  }, [lines, paused]);
 
   const services = [...new Set(lines.map(l => { const m = l.match(/^\[([^\]]+)\]/); return m?.[1] ?? null; }).filter(Boolean))];
   const filtered = lines.filter(line => {
-    if (serviceFilter && !line.includes(`[${serviceFilter}]`)) return false;
-    if (streamFilter  && !line.includes(`[${streamFilter}]`))  return false;
-    if (search        && !line.toLowerCase().includes(search.toLowerCase())) return false;
+    if (serviceFilter && !line.startsWith(`[${serviceFilter}]`))                    return false;
+    if (streamFilter  && !line.includes(`[${streamFilter}]`))                       return false;
+    if (search        && !line.toLowerCase().includes(search.toLowerCase()))         return false;
     return true;
   });
 
@@ -72,9 +60,9 @@ export default function Logs() {
           <p className="text-sm text-slate-500 mt-1">Real-time WebSocket stream from all managed processes</p>
         </div>
         <div className="flex items-center gap-2">
-          {wsConnected
-            ? <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full font-semibold"><Wifi className="w-3 h-3" />{wsStatus}</span>
-            : <span className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-full font-semibold"><WifiOff className="w-3 h-3" />{wsStatus}</span>
+          {connected
+            ? <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full font-semibold"><Wifi className="w-3 h-3" />Live</span>
+            : <span className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-full font-semibold"><WifiOff className="w-3 h-3" />Disconnected</span>
           }
         </div>
       </div>
@@ -83,7 +71,6 @@ export default function Logs() {
         {/* Controls */}
         <div className="flex items-center justify-between flex-wrap gap-3 px-5 pt-5 pb-4 border-b border-white/5">
           <div className="flex flex-wrap gap-3">
-            {/* Service filter */}
             <select value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}
               className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/40 transition-all"
             >
@@ -115,7 +102,7 @@ export default function Logs() {
             >
               <Trash2 className="w-3 h-3" /> Clear
             </motion.button>
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={connect}
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={reconnect}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white/[0.04] border-white/10 text-slate-400 hover:text-white transition-all"
             >
               <RefreshCw className="w-3 h-3" /> Reconnect
@@ -134,7 +121,7 @@ export default function Logs() {
           </div>
           <div className="flex items-center justify-between px-4 py-2 bg-white/[0.02] border-t border-white/5 text-[11px] text-slate-600">
             <span>{filtered.length} / {lines.length} lines{paused ? ' · PAUSED' : ''}</span>
-            <span>{wsStatus}</span>
+            <span>{connected ? 'WebSocket connected' : 'Reconnecting…'}</span>
           </div>
         </div>
       </motion.div>

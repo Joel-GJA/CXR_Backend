@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { hm, events } from '../api/client.js';
+import { useRealtime }  from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 function useCountUp(target, dur = 900) {
@@ -80,6 +81,7 @@ const ChartTooltip = ({ active, payload, label }) => {
 };
 
 export default function Overview() {
+  const { subscribe } = useRealtime();
   const [state, setState]           = useState(null);
   const [evtStats, setEvtStats]     = useState(null);
   const [registry, setRegistry]     = useState(null);
@@ -98,7 +100,15 @@ export default function Overview() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 8000); return () => clearInterval(t); }, [refresh]);
+  // Real-time: update rooms and service counts from WS state events
+  useEffect(() => subscribe('state', msg => {
+    if (msg.rooms !== undefined) {
+      setState(prev => prev ? { ...prev, rooms: msg.rooms } : { rooms: msg.rooms });
+      setLastUpdate(new Date().toLocaleTimeString());
+    }
+  }), [subscribe]);
+
+  useEffect(() => { refresh(); const t = setInterval(refresh, 30000); return () => clearInterval(t); }, [refresh]);
 
   const rooms   = state?.rooms || [];
   const running = rooms.filter(r => r.status === 'running').length;

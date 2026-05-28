@@ -75,7 +75,15 @@ class ProcessManager extends EventEmitter {
     }
     service.status = "stopping";
     service.stoppedAtUtc = new Date().toISOString();
+    service.manualStop = true;   // prevent crash-recovery restart after manual stop
     service.childProcess.kill("SIGTERM");
+    // If SIGTERM is ignored, force-kill after 6 seconds
+    const forceKill = setTimeout(() => {
+      if (service.childProcess && !service.childProcess.killed) {
+        service.childProcess.kill("SIGKILL");
+      }
+    }, 6000);
+    service.childProcess.once("exit", () => clearTimeout(forceKill));
     return this._serialize(service);
   }
 
@@ -190,7 +198,8 @@ class ProcessManager extends EventEmitter {
 
     childProcess.on("exit", (code, signal) => {
       const wasIntentional = service.pendingRestart;
-      const wasCrash = this.crashRecoveryEnabled && code !== 0 && signal !== "SIGTERM";
+      // manualStop: user clicked Stop — never restart regardless of exit code
+      const wasCrash = this.crashRecoveryEnabled && !service.manualStop && code !== 0 && signal !== "SIGTERM";
       const shouldRestart = (wasIntentional || wasCrash) && service.restartCount < service.maxRestarts;
       service.lastExitCode = code;
       service.lastExitSignal = signal;
@@ -219,9 +228,13 @@ class ProcessManager extends EventEmitter {
 
       if (shouldRestart) {
         service.pendingRestart = false;
+        // Exponential backoff: 1s, 2s, 4s, 8s, capped at 15s
+        const backoffMs = Math.min(1000 * Math.pow(2, service.restartCount), 15000);
         service.restartCount++;
-        this._prepareRestart(service);
-        this._spawn(service);
+        setTimeout(() => {
+          this._prepareRestart(service);
+          this._spawn(service);
+        }, backoffMs);
       }
     });
   }
@@ -235,6 +248,7 @@ class ProcessManager extends EventEmitter {
     service.lastExitCode = null;
     service.lastExitSignal = null;
     service.pendingRestart = false;
+    service.manualStop = false;
     service.cpu = null;
     service.memory = null;
   }

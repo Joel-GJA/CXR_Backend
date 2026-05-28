@@ -4,6 +4,7 @@ import { Boxes, Plus, RotateCcw, Square, FileText, Users, Wifi, WifiOff, Package
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogTerminal from '../components/LogTerminal.jsx';
 import { hm, buildsApi } from '../api/client.js';
+import { useRealtime }   from '../contexts/RealtimeContext.jsx';
 import { cn } from '../lib/utils.js';
 
 const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
@@ -28,6 +29,7 @@ function Btn({ onClick, disabled, loading, icon: Icon, children, variant = 'defa
 }
 
 export default function Rooms() {
+  const { subscribe } = useRealtime();
   const [rooms,      setRooms]      = useState([]);
   const [buildList,  setBuildList]  = useState([]);   // merged list of { id, name, path, executable }
   const [registry,   setRegistry]   = useState(null);
@@ -96,10 +98,16 @@ export default function Rooms() {
     if (reg.status === 'fulfilled') setRegistry(reg.value);
   }, []);
 
+  // Real-time: subscribe to WS state events for instant room updates
+  useEffect(() => subscribe('state', msg => {
+    if (msg.rooms) setRooms(msg.rooms);
+  }), [subscribe]);
+
   useEffect(() => {
     loadBuilds();
     load();
-    const t = setInterval(load, 5000);
+    // Keep polling as a fallback only (WS handles live updates)
+    const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load, loadBuilds]);
 

@@ -48,6 +48,24 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: '2mb' }));
 
+// ── SPA fallback for routes that clash with API endpoints ─────────────────────
+// Browser navigations send Sec-Fetch-Dest: document; API fetches don't.
+const clientDist = path.join(__dirname, '../client/dist');
+const PANEL_UI_PATHS = new Set([
+  '/overview', '/hostmanager', '/rooms', '/services',
+  '/logs', '/health', '/events', '/builds', '/users', '/login',
+]);
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  if (!PANEL_UI_PATHS.has(req.path)) return next();
+  const dest   = req.headers['sec-fetch-dest'];
+  const accept = req.headers.accept || '';
+  if (dest === 'document' || (!dest && accept.includes('text/html'))) {
+    return res.sendFile(path.join(clientDist, 'index.html'), err => err && next());
+  }
+  next();
+});
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
   // 1. Legacy static token — for Unity / external API clients
@@ -84,6 +102,7 @@ app.post('/rooms', authMiddleware, async (req, res) => {
   try {
     const room = await roomManager.createRoom(req.body);
     res.status(201).json(room);
+    setImmediate(pushState);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -94,12 +113,12 @@ app.get('/rooms/:id', authMiddleware, (req, res) => {
 });
 
 app.post('/rooms/:id/stop', authMiddleware, (req, res) => {
-  try { res.json(roomManager.stopRoom(req.params.id)); }
+  try { res.json(roomManager.stopRoom(req.params.id)); setImmediate(pushState); }
   catch (err) { res.status(409).json({ error: err.message }); }
 });
 
 app.post('/rooms/:id/restart', authMiddleware, (req, res) => {
-  try { res.json(roomManager.restartRoom(req.params.id)); }
+  try { res.json(roomManager.restartRoom(req.params.id)); setImmediate(pushState); }
   catch (err) { res.status(409).json({ error: err.message }); }
 });
 
@@ -177,6 +196,7 @@ app.post('/api/registry/start', authMiddleware, async (req, res) => {
     }, { label: 'room-registry', serviceId: `registry-${Date.now()}` });
     registryServiceId = id;
     res.json({ ok: true, serviceId: id, url: config.registryUrl });
+    setImmediate(pushState);
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -185,6 +205,7 @@ app.post('/api/registry/stop', authMiddleware, (req, res) => {
   try {
     processManager.stop(registryServiceId);
     res.json({ ok: true });
+    setImmediate(pushState);
   } catch (err) { res.status(409).json({ error: err.message }); }
 });
 
@@ -193,6 +214,7 @@ app.post('/api/registry/restart', authMiddleware, (req, res) => {
   try {
     const svc = processManager.restart(registryServiceId);
     res.json({ ok: true, service: svc });
+    setImmediate(pushState);
   } catch (err) { res.status(409).json({ error: err.message }); }
 });
 
@@ -326,12 +348,13 @@ app.use('/api/events', require('./routes/events'));
 // ────────────────────────────────────────────────────────────────────────────
 // BUILD UPLOAD (upload + extract Unity builds into unity-builds/)
 // ────────────────────────────────────────────────────────────────────────────
-app.use('/api/builds', authMiddleware, require('./routes/builds-upload'));
+const buildsUploadRouter = require('./routes/builds-upload');
+buildsUploadRouter.setRoomManager(roomManager);  // so upload/delete refreshes build list
+app.use('/api/builds', authMiddleware, buildsUploadRouter);
 
 // ────────────────────────────────────────────────────────────────────────────
 // REACT BUILD (production)
 // ────────────────────────────────────────────────────────────────────────────
-const clientDist = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDist));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'), (err) => {
@@ -346,7 +369,15 @@ const server    = http.createServer(app);
 const logWsServer = new LogWebSocketServer(server);
 
 processManager.on('log',    (entry)  => logWsServer.broadcast(entry));
-processManager.on('status', (status) => logWsServer.broadcastStatus(status));
+processManager.on('status', (status) => {
+  logWsServer.broadcastStatus(status);
+  // Delay slightly so RoomManager can sync room status from the same event first
+  setTimeout(pushState, 60);
+});
+processManager.on('metrics', (m) => logWsServer.broadcastMessage({ type: 'metrics', ...m }));
+
+// Push a full state snapshot to all WS clients every 2 seconds
+setInterval(pushState, 2000);
 
 // Record request activity
 app.use((req, _res, next) => {
@@ -375,6 +406,28 @@ server.listen(config.port, '0.0.0.0', () => {
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
+
+// Build the real-time state snapshot that goes over WebSocket to all clients
+function buildStateSnapshot() {
+  const rooms    = roomManager.listRooms();
+  const services = processManager.list();
+  const regSvc   = registryServiceId ? services.find(s => s.serviceId === registryServiceId) : null;
+  return {
+    type:             'state',
+    rooms,
+    services,
+    registryRunning:  !!(regSvc && (regSvc.status === 'running' || regSvc.status === 'starting')),
+    registryServiceId,
+    roomCount:        rooms.length,
+    serviceCount:     services.length,
+    buildCount:       Object.keys(config.builds).length,
+  };
+}
+
+function pushState() {
+  try { if (logWsServer) logWsServer.broadcastMessage(buildStateSnapshot()); } catch (_) {}
+}
+
 async function fetchRegistryState() {
   const url = config.registryUrl;
   try {

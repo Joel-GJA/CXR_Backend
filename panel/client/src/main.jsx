@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ThemeProvider } from './contexts/ThemeContext.jsx';
-import { AuthProvider }  from './contexts/AuthContext.jsx';
-import { AlertProvider } from './contexts/AlertContext.jsx';
+import { ThemeProvider }    from './contexts/ThemeContext.jsx';
+import { AuthProvider }     from './contexts/AuthContext.jsx';
+import { AlertProvider }    from './contexts/AlertContext.jsx';
+import { RealtimeProvider } from './contexts/RealtimeContext.jsx';
 import App from './App.jsx';
 import './index.css';
 
@@ -12,7 +13,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <AlertProvider>
       <AuthProvider>
         <ThemeProvider>
-          <App />
+          <RealtimeProvider>
+            <App />
+          </RealtimeProvider>
         </ThemeProvider>
       </AuthProvider>
     </AlertProvider>

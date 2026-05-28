@@ -6,8 +6,9 @@ import {
   HeartPulse, Activity, UploadCloud, Users, LogOut,
   Sun, Moon, ChevronLeft, ChevronRight, Settings2,
 } from 'lucide-react';
-import { useTheme }  from '../contexts/ThemeContext.jsx';
-import { useAuth }   from '../contexts/AuthContext.jsx';
+import { useTheme }    from '../contexts/ThemeContext.jsx';
+import { useAuth }     from '../contexts/AuthContext.jsx';
+import { useRealtime } from '../contexts/RealtimeContext.jsx';
 import { Avatar }    from './ui/avatar.jsx';
 import { Badge }     from './ui/badge.jsx';
 import { cn } from '../lib/utils.js';
@@ -95,8 +96,9 @@ function NavItem({ to, icon: Icon, label, tag, idx, collapsed }) {
 }
 
 export default function Layout({ children }) {
-  const { isDark, toggle } = useTheme();
-  const { user, logout }   = useAuth();
+  const { isDark, toggle }  = useTheme();
+  const { user, logout }    = useAuth();
+  const { connected }       = useRealtime();
   const [collapsed, setCollapsed] = useState(false);
   let globalIdx = 0;
 
@@ -133,32 +135,33 @@ export default function Layout({ children }) {
         )}
 
         {/* Brand header */}
-        <div className="relative flex items-center gap-3 px-3 py-4 border-b border-white/[0.06] min-h-[60px]">
-          <motion.div
-            whileHover={{ scale: 1.08, rotate: 5 }}
-            whileTap={{ scale: 0.94 }}
-            className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_12px_#3b82f633] cursor-pointer"
-          >
-            <Zap className="w-4 h-4 text-white" />
-          </motion.div>
+        <div className="relative flex items-center px-3 py-4 border-b border-white/[0.06] min-h-[60px]">
           <AnimatePresence>
             {!collapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.16 }} className="overflow-hidden"
+                transition={{ duration: 0.16 }} className="flex items-center gap-3 flex-1 overflow-hidden min-w-0"
               >
-                <div className="text-[13px] font-bold text-white leading-tight whitespace-nowrap">CXR_Backend Panel</div>
-                <div className="text-[10px] text-blue-400/60 leading-tight mt-0.5 whitespace-nowrap">Ops · Phase 3</div>
+                <motion.div
+                  whileHover={{ scale: 1.08, rotate: 5 }}
+                  whileTap={{ scale: 0.94 }}
+                  className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_12px_#3b82f633] cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 text-white" />
+                </motion.div>
+                <div className="overflow-hidden">
+                  <div className="text-[13px] font-bold text-white leading-tight whitespace-nowrap">CXR_Backend Panel</div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Collapse toggle in header */}
+          {/* Collapse toggle — always visible, centers itself when collapsed */}
           <motion.button
             whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={() => setCollapsed(c => !c)}
             className={cn(
-              'flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-white/[0.06] transition-all',
+              'flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all',
               collapsed ? 'mx-auto' : 'ml-auto',
             )}
           >
@@ -173,9 +176,16 @@ export default function Layout({ children }) {
               initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
               className="px-3 pt-3 overflow-hidden"
             >
-              <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-1.5 w-fit">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-semibold text-blue-400/80 tracking-wider uppercase">Phase 3 · Live</span>
+              <div className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 w-fit border',
+                connected
+                  ? 'bg-blue-500/10 border-blue-500/20'
+                  : 'bg-red-500/10 border-red-500/20',
+              )}>
+                <span className={cn('w-1.5 h-1.5 rounded-full', connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400')} />
+                <span className={cn('text-[10px] font-semibold tracking-wider uppercase', connected ? 'text-blue-400/80' : 'text-red-400/80')}>
+                  {connected ? 'Backend · Live' : 'Reconnecting…'}
+                </span>
               </div>
             </motion.div>
           )}

@@ -91,6 +91,15 @@ class LogWebSocketServer {
     }
   }
 
+  // Broadcast any arbitrary message to all connected clients (no filter applied)
+  broadcastMessage(data) {
+    const message = JSON.stringify({ ...data, timestamp: new Date().toISOString() });
+    for (const client of this.clients) {
+      if (client.ws.readyState !== 1) { this.clients.delete(client); continue; }
+      try { client.ws.send(message); } catch (e) { this.clients.delete(client); }
+    }
+  }
+
   close() {
     clearInterval(this._pingInterval);
     for (const client of this.clients) {
