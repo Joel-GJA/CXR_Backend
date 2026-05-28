@@ -297,6 +297,11 @@ app.get('/api/logs/services/:id', authMiddleware, (req, res) => {
 app.use('/api/events', require('./routes/events'));
 
 // ────────────────────────────────────────────────────────────────────────────
+// BUILD UPLOAD (upload + extract Unity builds into unity-builds/)
+// ────────────────────────────────────────────────────────────────────────────
+app.use('/api/builds', authMiddleware, require('./routes/builds-upload'));
+
+// ────────────────────────────────────────────────────────────────────────────
 // REACT BUILD (production)
 // ────────────────────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, '../client/dist');

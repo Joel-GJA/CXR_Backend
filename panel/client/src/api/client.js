@@ -48,6 +48,34 @@ export const hm = {
   hostLogs: () => fetchJson('/api/logs/host-manager'),
 };
 
+// ── Build Upload ─────────────────────────────────────────────────────────────
+export const buildsApi = {
+  list:   ()           => fetchJson('/api/builds/list'),
+  delete: (name)       => fetchJson(`/api/builds/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  upload: (file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('build', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/builds/upload');
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+      }
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || `HTTP ${xhr.status}`));
+        } catch (e) { reject(e); }
+      };
+      xhr.onerror = () => reject(new Error('Upload failed (network error)'));
+      xhr.send(formData);
+    });
+  },
+};
+
 // ── Nareen's Event Persistence ───────────────────────────────────────────────
 export const events = {
   list:  (params = {})  => {

@@ -9,6 +9,7 @@ import Services    from './pages/Services.jsx';
 import Logs        from './pages/Logs.jsx';
 import Health      from './pages/Health.jsx';
 import Events      from './pages/Events.jsx';
+import Builds      from './pages/Builds.jsx';
 
 export default function App() {
   const location = useLocation();
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/logs"        element={<Logs />} />
           <Route path="/health"      element={<Health />} />
           <Route path="/events"      element={<Events />} />
+          <Route path="/builds"      element={<Builds />} />
         </Routes>
       </AnimatePresence>
     </Layout>

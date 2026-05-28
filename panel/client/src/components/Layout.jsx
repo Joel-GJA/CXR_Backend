@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, Boxes, Server, Terminal,
-  HeartPulse, Activity, Sun, Moon, ChevronLeft, ChevronRight,
+  HeartPulse, Activity, UploadCloud, Sun, Moon, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { cn } from '../lib/utils.js';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/logs',        icon: Terminal,        label: 'Live Logs'   },
   { to: '/health',      icon: HeartPulse,      label: 'Health'      },
   { to: '/events',      icon: Activity,        label: 'Events'      },
+  { to: '/builds',      icon: UploadCloud,     label: 'Build Upload' },
 ];
 
 const navItem = {
