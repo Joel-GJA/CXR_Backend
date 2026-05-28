@@ -76,6 +76,10 @@ export default function Health() {
               <KVRow label="Port"        value={health.hostManagerPort || health.panelPort} />
               <KVRow label="Rooms"       value={health.roomCount} />
               <KVRow label="Auth"        value={health.authEnabled ? 'Token required' : 'Open'} />
+              <KVRow label="Unity Builds" value={health.buildCount !== undefined ? `${health.buildCount} registered` : '—'} />
+              {health.buildsDir && (
+                <KVRow label="Builds Dir"  value={health.buildsDir} />
+              )}
             </>
           ) : <p className="text-sm text-slate-600 py-4">Loading...</p>}
         </Section>

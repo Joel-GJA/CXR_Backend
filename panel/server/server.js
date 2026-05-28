@@ -218,6 +218,8 @@ app.get('/health', (req, res) => {
     registryRunning: !!(registryServiceId && processManager.list().find(s => s.serviceId === registryServiceId && s.status === 'running')),
     authEnabled:     !!config.adminToken,
     eventBackend:    writer.backend || 'initializing',
+    buildsDir:       config.buildsDir,
+    buildCount:      Object.keys(roomManager.listBuilds()).length,
   });
 });
 
