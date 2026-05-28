@@ -229,8 +229,8 @@ class ProcessManager extends EventEmitter {
       if (shouldRestart) {
         service.pendingRestart = false;
         // Exponential backoff: 1s, 2s, 4s, 8s, capped at 15s
+        // restartCount is incremented inside _prepareRestart — don't double-increment here
         const backoffMs = Math.min(1000 * Math.pow(2, service.restartCount), 15000);
-        service.restartCount++;
         setTimeout(() => {
           this._prepareRestart(service);
           this._spawn(service);

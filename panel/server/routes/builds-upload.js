@@ -129,7 +129,12 @@ router.delete('/:name', (req, res) => {
   if (!/^[a-zA-Z0-9_\-. ]+$/.test(name)) {
     return res.status(400).json({ ok: false, error: 'Invalid build name.' });
   }
-  const dir = path.join(config.buildsDir, name);
+  // Prevent path traversal: '..', '...', etc. all pass the regex above but escape buildsDir
+  const dir         = path.resolve(config.buildsDir, name);
+  const buildsRoot  = path.resolve(config.buildsDir);
+  if (!dir.startsWith(buildsRoot + path.sep) || dir === buildsRoot) {
+    return res.status(400).json({ ok: false, error: 'Invalid build name.' });
+  }
   if (!fs.existsSync(dir)) {
     return res.status(404).json({ ok: false, error: 'Build not found.' });
   }

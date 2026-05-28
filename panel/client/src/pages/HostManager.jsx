@@ -70,7 +70,8 @@ export default function HostManager() {
   useEffect(() => subscribe('state', msg => {
     if (msg.services !== undefined) setServices(msg.services);
     if (msg.registryRunning !== undefined) {
-      setRegStatus(prev => prev ? { ...prev, running: msg.registryRunning } : { running: msg.registryRunning });
+      // Only patch running flag if HTTP already loaded url/port; otherwise let HTTP load handle it
+      setRegStatus(prev => prev ? { ...prev, running: msg.registryRunning } : null);
     }
     if (msg.rooms !== undefined) {
       // Update health room count from live state

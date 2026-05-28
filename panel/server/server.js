@@ -129,6 +129,11 @@ app.get('/services', authMiddleware, (req, res) => {
   res.json({ services: processManager.list() });
 });
 
+// Templates endpoint — services page can launch services from named templates
+app.get('/templates', authMiddleware, (req, res) => {
+  res.json({ templates: [] });
+});
+
 app.post('/services', authMiddleware, async (req, res) => {
   try {
     const { executable, args = [], cwd, env = {}, label, needsPort } = req.body;

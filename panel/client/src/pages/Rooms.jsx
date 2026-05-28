@@ -344,8 +344,12 @@ export default function Rooms() {
                     </div>
                   </div>
                   <div className="flex gap-2 p-3 flex-wrap">
-                    <Btn onClick={() => restartRoom(room.roomId)} loading={busy[room.roomId] === 'restart'} icon={RotateCcw} sm>Restart</Btn>
-                    <Btn onClick={() => stopRoom(room.roomId)}    loading={busy[room.roomId] === 'stop'}    icon={Square}    sm variant="danger">Stop</Btn>
+                    {(room.status === 'running' || room.status === 'starting') && (
+                      <Btn onClick={() => restartRoom(room.roomId)} loading={busy[room.roomId] === 'restart'} icon={RotateCcw} sm>Restart</Btn>
+                    )}
+                    {(room.status === 'running' || room.status === 'starting') && (
+                      <Btn onClick={() => stopRoom(room.roomId)} loading={busy[room.roomId] === 'stop'} icon={Square} sm variant="danger">Stop</Btn>
+                    )}
                     <Btn
                       onClick={() => roomLogs[room.roomId]
                         ? setRoomLogs(p => { const n = { ...p }; delete n[room.roomId]; return n; })

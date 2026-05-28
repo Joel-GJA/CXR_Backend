@@ -1,0 +1,142 @@
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import {
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useScroll,
+  useSpring,
+  useTransform,
+  useVelocity,
+} from 'framer-motion';
+import { cn } from '../../lib/utils.js';
+
+export const wrap = (min, max, v) => {
+  const r = max - min;
+  return ((((v - min) % r) + r) % r) + min;
+};
+
+const ScrollVelocityContext = createContext(null);
+
+export function ScrollVelocityContainer({ children, className, ...props }) {
+  const { scrollY } = useScroll();
+  const scrollVelocity = useVelocity(scrollY);
+  const smoothVelocity = useSpring(scrollVelocity, { damping: 50, stiffness: 400 });
+  const velocityFactor = useTransform(smoothVelocity, (v) => {
+    const sign = v < 0 ? -1 : 1;
+    const magnitude = Math.min(5, (Math.abs(v) / 1000) * 5);
+    return sign * magnitude;
+  });
+  return (
+    <ScrollVelocityContext.Provider value={velocityFactor}>
+      <div className={cn('relative w-full', className)} {...props}>{children}</div>
+    </ScrollVelocityContext.Provider>
+  );
+}
+
+function ScrollVelocityRowImpl({
+  children,
+  baseVelocity = 5,
+  direction    = 1,
+  className,
+  velocityFactor,
+  scrollReactivity = true,
+  ...props
+}) {
+  const containerRef = useRef(null);
+  const blockRef     = useRef(null);
+  const [numCopies, setNumCopies] = useState(1);
+
+  const baseX                  = useMotionValue(0);
+  const baseDirectionRef       = useRef(direction >= 0 ? 1 : -1);
+  const currentDirectionRef    = useRef(direction >= 0 ? 1 : -1);
+  const unitWidth              = useMotionValue(0);
+  const isInViewRef            = useRef(true);
+  const isPageVisibleRef       = useRef(true);
+  const prefersReducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const block     = blockRef.current;
+    let ro, io, mq;
+    const handleVisibility = () => { isPageVisibleRef.current = document.visibilityState === 'visible'; };
+    const handlePRM = () => { if (mq) prefersReducedMotionRef.current = mq.matches; };
+
+    if (container && block) {
+      const updateSizes = () => {
+        const cw = container.offsetWidth || 0;
+        const bw = block.scrollWidth || 0;
+        unitWidth.set(bw);
+        const next = bw > 0 ? Math.max(3, Math.ceil(cw / bw) + 2) : 1;
+        setNumCopies(prev => prev === next ? prev : next);
+      };
+      updateSizes();
+      ro = new ResizeObserver(updateSizes);
+      ro.observe(container); ro.observe(block);
+      io = new IntersectionObserver(([entry]) => { isInViewRef.current = entry.isIntersecting; });
+      io.observe(container);
+      document.addEventListener('visibilitychange', handleVisibility, { passive: true });
+      handleVisibility();
+      mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      mq.addEventListener('change', handlePRM);
+      handlePRM();
+    }
+    return () => {
+      ro?.disconnect(); io?.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibility);
+      mq?.removeEventListener('change', handlePRM);
+    };
+  }, [children, unitWidth]);
+
+  const x = useTransform([baseX, unitWidth], ([v, bw]) => {
+    const width = Number(bw) || 1;
+    const offset = Number(v) || 0;
+    return `${-wrap(0, width, offset)}px`;
+  });
+
+  useAnimationFrame((_, delta) => {
+    if (!isInViewRef.current || !isPageVisibleRef.current) return;
+    const dt = delta / 1000;
+    const vf = scrollReactivity ? velocityFactor.get() : 0;
+    const absVf = Math.min(5, Math.abs(vf));
+    const speedMultiplier = prefersReducedMotionRef.current ? 1 : 1 + absVf;
+    if (absVf > 0.1) {
+      const scrollDir = vf >= 0 ? 1 : -1;
+      currentDirectionRef.current = baseDirectionRef.current * scrollDir;
+    }
+    const bw = unitWidth.get() || 0;
+    if (bw <= 0) return;
+    const pps = (bw * baseVelocity) / 100;
+    const moveBy = currentDirectionRef.current * pps * speedMultiplier * dt;
+    baseX.set(baseX.get() + moveBy);
+  });
+
+  return (
+    <div ref={containerRef} className={cn('w-full overflow-hidden whitespace-nowrap', className)} {...props}>
+      <motion.div className="inline-flex transform-gpu items-center will-change-transform select-none" style={{ x }}>
+        {Array.from({ length: numCopies }).map((_, i) => (
+          <div key={i} ref={i === 0 ? blockRef : null} aria-hidden={i !== 0} className="inline-flex shrink-0 items-center">
+            {children}
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+function ScrollVelocityRowLocal(props) {
+  const { scrollY } = useScroll();
+  const localVelocity = useVelocity(scrollY);
+  const localSmooth = useSpring(localVelocity, { damping: 50, stiffness: 400 });
+  const localFactor = useTransform(localSmooth, (v) => {
+    const sign = v < 0 ? -1 : 1;
+    const magnitude = Math.min(5, (Math.abs(v) / 1000) * 5);
+    return sign * magnitude;
+  });
+  return <ScrollVelocityRowImpl {...props} velocityFactor={localFactor} />;
+}
+
+export function ScrollVelocityRow(props) {
+  const shared = useContext(ScrollVelocityContext);
+  if (shared) return <ScrollVelocityRowImpl {...props} velocityFactor={shared} />;
+  return <ScrollVelocityRowLocal {...props} />;
+}

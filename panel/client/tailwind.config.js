@@ -25,6 +25,7 @@ module.exports = {
         'shimmer':     'shimmer 2.5s linear infinite',
         'ping-slow':   'ping 2.2s cubic-bezier(0,0,0.2,1) infinite',
         'float':       'float 4s ease-in-out infinite',
+        'meteor':      'meteor 5s linear infinite',
       },
       keyframes: {
         glowPulse: {

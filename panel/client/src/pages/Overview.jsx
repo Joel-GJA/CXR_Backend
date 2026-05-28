@@ -8,7 +8,9 @@ import {
 } from 'recharts';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { hm, events } from '../api/client.js';
-import { useRealtime }  from '../contexts/RealtimeContext.jsx';
+import { useRealtime }     from '../contexts/RealtimeContext.jsx';
+import { WordRotate }      from '../components/ui/word-rotate.jsx';
+import { ScrollVelocityContainer, ScrollVelocityRow } from '../components/ui/scroll-based-velocity.jsx';
 import { cn } from '../lib/utils.js';
 
 function useCountUp(target, dur = 900) {
@@ -100,10 +102,10 @@ export default function Overview() {
     } finally { setLoading(false); }
   }, []);
 
-  // Real-time: update rooms and service counts from WS state events
+  // Real-time: update rooms from WS state events (only patch if HTTP already loaded other fields)
   useEffect(() => subscribe('state', msg => {
     if (msg.rooms !== undefined) {
-      setState(prev => prev ? { ...prev, rooms: msg.rooms } : { rooms: msg.rooms });
+      setState(prev => prev ? { ...prev, rooms: msg.rooms } : prev);
       setLastUpdate(new Date().toLocaleTimeString());
     }
   }), [subscribe]);
@@ -139,9 +141,15 @@ export default function Overview() {
       <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Overview</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            System snapshot{lastUpdate && ` · Updated ${lastUpdate}`}
-          </p>
+          <div className="text-sm text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
+            <span>Live</span>
+            <WordRotate
+              words={['system snapshot', 'rooms & services', 'registry health', 'event stream']}
+              duration={2800}
+              className="text-blue-400 font-semibold"
+            />
+            {lastUpdate && <span className="text-slate-600">· Updated {lastUpdate}</span>}
+          </div>
         </div>
         <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={refresh}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
@@ -380,6 +388,27 @@ export default function Overview() {
           </div>
         </motion.div>
       )}
+
+      {/* Tech-stack ticker — scrolls horizontally, speeds up on scroll */}
+      <div className="mt-10 -mx-8 border-t border-white/[0.04] pt-6 select-none">
+        <ScrollVelocityContainer>
+          <ScrollVelocityRow baseVelocity={4} direction={1}>
+            {['Unity', 'Mirror', 'WebSocket', 'Express', 'Node.js', 'React', 'Vite', 'Tailwind', 'Supabase', 'PostgreSQL'].map((tech, i) => (
+              <span key={`${tech}-${i}`} className="mx-6 inline-flex items-center gap-2 text-2xl font-extrabold text-white/10 hover:text-cyan-400/40 transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/40" />
+                {tech}
+              </span>
+            ))}
+          </ScrollVelocityRow>
+          <ScrollVelocityRow baseVelocity={3} direction={-1} className="mt-2">
+            {['XR Multiplayer', 'Headless Server', 'Real-time Sync', 'Calibration', 'Ownership', 'Phase 3', 'CXR_Backend'].map((label, i) => (
+              <span key={`${label}-${i}`} className="mx-6 inline-block text-xl font-bold text-blue-500/10 tracking-wider uppercase">
+                {label}
+              </span>
+            ))}
+          </ScrollVelocityRow>
+        </ScrollVelocityContainer>
+      </div>
     </motion.div>
   );
 }

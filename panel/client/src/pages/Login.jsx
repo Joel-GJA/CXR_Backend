@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { Meteors }      from '../components/ui/meteors.jsx';
+import { MorphingText } from '../components/ui/morphing-text.jsx';
 import { cn } from '../lib/utils.js';
 
 const ROLE_COLORS = { admin: 'text-blue-400', operator: 'text-emerald-400', viewer: 'text-yellow-400' };
@@ -35,6 +37,9 @@ export default function Login() {
       <div className="absolute inset-0 bg-blue-radial" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-blue-600/8 blur-[120px] rounded-full" />
 
+      {/* Meteor shower */}
+      <Meteors number={22} minDuration={3} maxDuration={9} className="bg-cyan-300 shadow-[0_0_0_1px_#06b6d420]" />
+
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0,  scale: 1    }}
@@ -42,17 +47,28 @@ export default function Login() {
         className="relative z-10 w-full max-w-sm"
       >
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8 gap-3">
+        <div className="flex flex-col items-center mb-8 gap-4">
           <motion.div
-            animate={{ boxShadow: ['0 0 10px rgba(59,130,246,0.3)', '0 0 30px rgba(59,130,246,0.6)', '0 0 10px rgba(59,130,246,0.3)'] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="relative"
           >
-            <Zap className="w-7 h-7 text-white" />
+            {/* Glow effect behind banner */}
+            <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-2xl scale-110 pointer-events-none" />
+            <motion.img
+              src="/cxr-banner.png"
+              alt="CXR"
+              animate={{ filter: ['drop-shadow(0 0 8px rgba(6,182,212,0.4))', 'drop-shadow(0 0 20px rgba(6,182,212,0.7))', 'drop-shadow(0 0 8px rgba(6,182,212,0.4))'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative w-72 rounded-2xl object-contain"
+            />
           </motion.div>
-          <div className="text-center">
-            <h1 className="text-xl font-bold text-white">CXR_Backend Panel</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Ops · Phase 3</p>
+          <div className="text-center w-full">
+            <MorphingText
+              texts={['Backend Panel', 'Operations Hub', 'XR Multiplayer', 'Real-time Ops']}
+              className="h-10 text-[22px] text-cyan-300/90 tracking-wide"
+            />
           </div>
         </div>
 

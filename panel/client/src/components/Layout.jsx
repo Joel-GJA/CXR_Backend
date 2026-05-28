@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, Boxes, Server, Terminal,
   HeartPulse, Activity, UploadCloud, Users, LogOut,
-  Sun, Moon, ChevronLeft, ChevronRight, Settings2,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useTheme }    from '../contexts/ThemeContext.jsx';
 import { useAuth }     from '../contexts/AuthContext.jsx';
 import { useRealtime } from '../contexts/RealtimeContext.jsx';
+import { AnimatedThemeToggler } from './ui/animated-theme-toggler.jsx';
 import { Avatar }    from './ui/avatar.jsx';
 import { Badge }     from './ui/badge.jsx';
 import { cn } from '../lib/utils.js';
@@ -96,7 +97,7 @@ function NavItem({ to, icon: Icon, label, tag, idx, collapsed }) {
 }
 
 export default function Layout({ children }) {
-  const { isDark, toggle }  = useTheme();
+  const { isDark }  = useTheme();
   const { user, logout }    = useAuth();
   const { connected }       = useRealtime();
   const [collapsed, setCollapsed] = useState(false);
@@ -135,35 +136,41 @@ export default function Layout({ children }) {
         )}
 
         {/* Brand header */}
-        <div className="relative flex items-center px-3 py-4 border-b border-white/[0.06] min-h-[60px]">
+        <div className={cn(
+          'relative border-b border-white/[0.06] min-h-[60px]',
+          collapsed
+            ? 'flex flex-col items-center justify-center gap-1.5 py-3'
+            : 'flex items-center gap-2.5 px-3 py-3',
+        )}>
+          {/* CXR hexagonal logo — always visible */}
+          <motion.img
+            src="/cxr-logo.png"
+            alt="CXR"
+            whileHover={{ scale: 1.1, rotate: 3 }}
+            whileTap={{ scale: 0.93 }}
+            className={cn(
+              'object-contain flex-shrink-0 cursor-pointer drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]',
+              collapsed ? 'w-9 h-9' : 'w-8 h-8',
+            )}
+          />
+
+          {/* Brand text — only when expanded */}
           <AnimatePresence>
             {!collapsed && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.16 }} className="flex items-center gap-3 flex-1 overflow-hidden min-w-0"
+                transition={{ duration: 0.16 }} className="flex-1 overflow-hidden min-w-0"
               >
-                <motion.div
-                  whileHover={{ scale: 1.08, rotate: 5 }}
-                  whileTap={{ scale: 0.94 }}
-                  className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_12px_#3b82f633] cursor-pointer"
-                >
-                  <Zap className="w-4 h-4 text-white" />
-                </motion.div>
-                <div className="overflow-hidden">
-                  <div className="text-[13px] font-bold text-white leading-tight whitespace-nowrap">CXR_Backend Panel</div>
-                </div>
+                <div className="text-[13px] font-bold text-white leading-tight whitespace-nowrap">CXR Backend Panel</div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Collapse toggle — always visible, centers itself when collapsed */}
+          {/* Collapse / expand toggle */}
           <motion.button
             whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={() => setCollapsed(c => !c)}
-            className={cn(
-              'flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all',
-              collapsed ? 'mx-auto' : 'ml-auto',
-            )}
+            className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all"
           >
             {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </motion.button>
@@ -262,20 +269,16 @@ export default function Layout({ children }) {
             </motion.button>
           )}
 
-          {/* Theme toggle */}
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={toggle}
-            title={isDark ? 'Light Mode' : 'Dark Mode'}
+          {/* Theme toggle — animated view-transition reveal */}
+          <AnimatedThemeToggler
+            variant="circle"
+            duration={500}
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             className={cn(
               'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] text-slate-500 hover:text-slate-200 hover:bg-white/[0.05] transition-all',
               collapsed && 'justify-center px-0',
             )}
           >
-            {isDark
-              ? <Sun  className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
-              : <Moon className="w-3.5 h-3.5 text-blue-400  flex-shrink-0" />
-            }
             <AnimatePresence>
               {!collapsed && (
                 <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="whitespace-nowrap">
@@ -283,7 +286,7 @@ export default function Layout({ children }) {
                 </motion.span>
               )}
             </AnimatePresence>
-          </motion.button>
+          </AnimatedThemeToggler>
         </div>
       </motion.aside>
 
