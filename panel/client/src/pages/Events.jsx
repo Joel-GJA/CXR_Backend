@@ -1,265 +1,271 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Send, History, Filter, RefreshCw, Database, Zap } from 'lucide-react';
 import { events } from '../api/client.js';
+import { cn } from '../lib/utils.js';
+
+const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
 
 const EVENT_TYPES = [
-  'RoomCreated', 'RoomClosed', 'RoomStarted', 'RoomStopped',
-  'PlayerJoined', 'PlayerLeft',
-  'OwnershipAcquired', 'OwnershipReleased', 'OwnershipTransferred',
-  'CalibrationStarted', 'CalibrationCompleted',
-  'SessionStarted', 'SessionEnded',
-  'ServerStarted', 'ServerStopped',
+  'RoomCreated','RoomClosed','RoomStarted','RoomStopped',
+  'PlayerJoined','PlayerLeft',
+  'OwnershipAcquired','OwnershipReleased','OwnershipTransferred',
+  'CalibrationStarted','CalibrationCompleted',
+  'SessionStarted','SessionEnded','ServerStarted','ServerStopped',
 ];
 
-export default function Events() {
-  const [evts,       setEvts]       = useState([]);
-  const [stats,      setStats]      = useState(null);
-  const [replayData, setReplayData] = useState(null);
-  const [error,      setError]      = useState('');
-  const [msg,        setMsg]        = useState('');
-  const [loading,    setLoading]    = useState(false);
+function evtColor(type) {
+  if (!type) return 'text-slate-500';
+  if (type.includes('Created') || type.includes('Started') || type.includes('Joined') || type.includes('Acquired'))
+    return 'text-emerald-400';
+  if (type.includes('Closed') || type.includes('Stopped') || type.includes('Left') || type.includes('Released'))
+    return 'text-red-400';
+  if (type.includes('Transfer') || type.includes('Calibration'))
+    return 'text-yellow-400';
+  return 'text-blue-400';
+}
 
-  // Filters
+function fmtTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString();
+}
+
+export default function Events() {
+  const [evts,          setEvts]          = useState([]);
+  const [stats,         setStats]         = useState(null);
+  const [replayData,    setReplayData]    = useState(null);
+  const [loading,       setLoading]       = useState(false);
+  const [toast,         setToast]         = useState(null);
   const [filterType,    setFilterType]    = useState('');
   const [filterSession, setFilterSession] = useState('');
   const [filterRoom,    setFilterRoom]    = useState('');
-
-  // Test event form
+  const [replaySessId,  setReplaySessId]  = useState('');
   const [newEvent, setNewEvent] = useState({
-    eventType: 'PlayerJoined',
-    sessionId: '',
-    roomId:    '',
-    participantId: '',
-    metadata:  '{}',
+    eventType: 'PlayerJoined', sessionId: '', roomId: '', participantId: '', metadata: '{}',
   });
-
-  // Replay
-  const [replaySessionId, setReplaySessionId] = useState('');
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { limit: 100 };
       if (filterType)    params.eventType = filterType;
       if (filterSession) params.sessionId = filterSession;
       if (filterRoom)    params.roomId    = filterRoom;
-      params.limit = 100;
       const [evtRes, statsRes] = await Promise.allSettled([events.list(params), events.stats()]);
       if (evtRes.status   === 'fulfilled') setEvts(evtRes.value.events || []);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
+    } finally { setLoading(false); }
   }, [filterType, filterSession, filterRoom]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  async function sendTestEvent() {
+  async function sendEvent() {
     try {
       let metadata = {};
-      try { metadata = JSON.parse(newEvent.metadata); } catch { metadata = {}; }
-      const payload = {
-        eventType:     newEvent.eventType,
-        sessionId:     newEvent.sessionId || undefined,
-        roomId:        newEvent.roomId    || undefined,
-        participantId: newEvent.participantId || undefined,
-        ...metadata,
-      };
-      await events.write(payload);
-      flash('Event written');
+      try { metadata = JSON.parse(newEvent.metadata); } catch {}
+      await events.write({ eventType: newEvent.eventType, sessionId: newEvent.sessionId || undefined, roomId: newEvent.roomId || undefined, participantId: newEvent.participantId || undefined, ...metadata });
+      flash('Event written successfully');
       loadEvents();
-    } catch (err) { setError(err.message); }
+    } catch (e) { flash(e.message, 'error'); }
   }
 
   async function replaySession() {
-    if (!replaySessionId) return;
+    if (!replaySessId) return;
     try {
-      const data = await events.replay(replaySessionId);
+      const data = await events.replay(replaySessId);
       setReplayData(data);
-    } catch (err) { setError(err.message); }
+    } catch (e) { flash(e.message, 'error'); }
   }
 
-  function flash(m) { setMsg(m); setTimeout(() => setMsg(''), 3000); }
+  function flash(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); }
 
-  function fmtTime(ts) {
-    if (!ts) return '—';
-    return new Date(ts).toLocaleTimeString();
-  }
-
-  function eventColor(type) {
-    if (!type) return 'var(--muted)';
-    if (type.includes('Created') || type.includes('Started') || type.includes('Joined')) return 'var(--success)';
-    if (type.includes('Closed')  || type.includes('Stopped') || type.includes('Left'))   return 'var(--danger)';
-    if (type.includes('Transfer') || type.includes('Calibration'))                        return 'var(--warning)';
-    return 'var(--primary)';
-  }
+  const inputCls = 'bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all w-full';
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Events</h1>
-        <p className="page-sub">Nareen Phase 3 — Persistence pipeline. Event writer with PostgreSQL + JSONL fallback.</p>
-      </div>
+    <motion.div variants={page} initial="initial" animate="animate" exit="exit" className="p-8 max-w-7xl mx-auto">
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div initial={{ opacity: 0, y: -16, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: -16, x: '-50%' }}
+            className={cn('fixed top-6 left-1/2 z-50 flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold border shadow-card',
+              toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400' : 'bg-red-500/15 border-red-500/25 text-red-400'
+            )}
+          >{toast.msg}</motion.div>
+        )}
+      </AnimatePresence>
 
-      {error && <div className="alert alert-error">{error}</div>}
-      {msg   && <div className="alert alert-success">{msg}</div>}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+          <Activity className="w-6 h-6 text-blue-400" /> Events
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">Phase 3 persistence pipeline — PostgreSQL + JSONL fallback</p>
+      </div>
 
       {/* Stats */}
       {stats && (
-        <div className="stat-row" style={{ marginBottom: 20 }}>
-          <div className="stat-card">
-            <div className="stat-label">Total Events</div>
-            <div className="stat-value blue">{stats.total}</div>
-            <div className="stat-sub">{stats.backend}</div>
-          </div>
-          {(stats.byType || []).slice(0, 3).map(({ event_type, count }) => (
-            <div key={event_type} className="stat-card">
-              <div className="stat-label">{event_type}</div>
-              <div className="stat-value">{count}</div>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: 'Total Events', value: stats.total, color: 'purple', icon: Database },
+            ...(stats.byType || []).slice(0, 3).map(({ event_type, count }) => ({
+              label: event_type, value: count, color: 'blue', icon: Zap,
+            })),
+          ].map(({ label, value, color, icon: Icon }, i) => (
+            <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+              className="glass p-4 text-center group hover:scale-[1.02] transition-transform cursor-default"
+            >
+              <div className={cn('text-2xl font-extrabold tabular-nums', color === 'purple' ? 'text-purple-400' : 'text-blue-400')}>{value}</div>
+              <div className="text-[11px] text-slate-500 mt-1 truncate">{label}</div>
+            </motion.div>
           ))}
         </div>
       )}
 
-      <div className="two-col">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Send test event */}
-        <div className="card">
-          <div className="card-title">Send Test Event</div>
-          <p className="card-subtitle">Manually ingest an event to test the persistence pipeline.</p>
-          <div className="form-row" style={{ flexDirection: 'column', gap: 10 }}>
-            <div className="form-group">
-              <label>Event Type</label>
-              <select value={newEvent.eventType} onChange={e => setNewEvent(n => ({ ...n, eventType: e.target.value }))}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass">
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <Send className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-semibold text-white">Send Test Event</span>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-500">Event Type</label>
+              <select value={newEvent.eventType} onChange={e => setNewEvent(n => ({ ...n, eventType: e.target.value }))} className={inputCls}>
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Session ID</label>
-                <input type="text" value={newEvent.sessionId} onChange={e => setNewEvent(n => ({ ...n, sessionId: e.target.value }))} placeholder="sess_..." />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-500">Session ID</label>
+                <input type="text" value={newEvent.sessionId} onChange={e => setNewEvent(n => ({ ...n, sessionId: e.target.value }))} placeholder="sess_..." className={inputCls} />
               </div>
-              <div className="form-group">
-                <label>Room ID</label>
-                <input type="text" value={newEvent.roomId} onChange={e => setNewEvent(n => ({ ...n, roomId: e.target.value }))} placeholder="room_..." />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-500">Room ID</label>
+                <input type="text" value={newEvent.roomId} onChange={e => setNewEvent(n => ({ ...n, roomId: e.target.value }))} placeholder="room_..." className={inputCls} />
               </div>
             </div>
-            <div className="form-group">
-              <label>Participant ID</label>
-              <input type="text" value={newEvent.participantId} onChange={e => setNewEvent(n => ({ ...n, participantId: e.target.value }))} placeholder="p_..." />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-500">Participant ID</label>
+              <input type="text" value={newEvent.participantId} onChange={e => setNewEvent(n => ({ ...n, participantId: e.target.value }))} placeholder="p_..." className={inputCls} />
             </div>
-            <div className="form-group">
-              <label>Extra Metadata (JSON)</label>
-              <input type="text" value={newEvent.metadata} onChange={e => setNewEvent(n => ({ ...n, metadata: e.target.value }))} placeholder='{"objectId": "cube1"}' />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-500">Metadata JSON</label>
+              <input type="text" value={newEvent.metadata} onChange={e => setNewEvent(n => ({ ...n, metadata: e.target.value }))} placeholder='{"objectId":"cube1"}' className={inputCls} />
             </div>
-            <button className="btn btn-primary" onClick={sendTestEvent}>Write Event</button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={sendEvent}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-glow-blue-sm"
+            >
+              <Send className="w-4 h-4" /> Write Event
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Session replay */}
-        <div className="card">
-          <div className="card-title">Session Replay</div>
-          <p className="card-subtitle">Fetch all events for a session ID and view the timeline.</p>
-          <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Session ID</label>
-              <input type="text" value={replaySessionId} onChange={e => setReplaySessionId(e.target.value)} placeholder="sess_..." />
-            </div>
-            <div className="form-group" style={{ justifyContent: 'flex-end' }}>
-              <button className="btn btn-primary" onClick={replaySession} disabled={!replaySessionId}>Replay</button>
-            </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass">
+          <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-white/5">
+            <History className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-semibold text-white">Session Replay</span>
           </div>
-          {replayData && (
-            <div style={{ marginTop: 14 }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                {replayData.count} events for session {replayData.sessionId}
-              </div>
-              <div className="terminal terminal-md">
-                {replayData.events.length === 0
-                  ? 'No events found for this session.'
-                  : replayData.events.map((e, i) => (
-                    <div key={i} style={{ borderBottom: '1px solid #21262d', paddingBottom: 4, marginBottom: 4 }}>
-                      <span style={{ color: 'var(--muted)', fontSize: 11 }}>{fmtTime(e.timestamp || e.created_at)}</span>
-                      {' '}
-                      <span style={{ color: eventColor(e.eventType || e.event_type), fontWeight: 600 }}>
-                        {e.eventType || e.event_type}
-                      </span>
-                      {(e.participantId || e.participant_id) && (
-                        <span style={{ color: 'var(--muted)', fontSize: 11 }}> · {e.participantId || e.participant_id}</span>
-                      )}
-                    </div>
-                  ))
-                }
-              </div>
+          <div className="p-5">
+            <div className="flex gap-3 mb-4">
+              <input type="text" value={replaySessId} onChange={e => setReplaySessId(e.target.value)} placeholder="Session ID (sess_...)" className={cn(inputCls, 'flex-1')} />
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={replaySession} disabled={!replaySessId}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold disabled:opacity-40 transition-all"
+              >
+                <History className="w-4 h-4" /> Replay
+              </motion.button>
             </div>
-          )}
-        </div>
+            {replayData && (
+              <div>
+                <div className="text-xs text-slate-500 mb-2">{replayData.count} events for <span className="font-mono text-slate-400">{replayData.sessionId}</span></div>
+                <div className="rounded-xl overflow-hidden border border-blue-500/10 bg-[#020810]">
+                  <div className="flex gap-1.5 px-4 py-2 bg-white/[0.02] border-b border-white/5">
+                    <span className="w-2 h-2 rounded-full bg-red-500/70" />
+                    <span className="w-2 h-2 rounded-full bg-yellow-500/70" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500/70" />
+                  </div>
+                  <div className="p-4 h-60 overflow-y-auto font-mono text-[11px] space-y-1">
+                    {replayData.events.length === 0 ? (
+                      <span className="text-slate-700">No events found.</span>
+                    ) : replayData.events.map((e, i) => (
+                      <div key={i} className="flex gap-3">
+                        <span className="text-slate-600 flex-shrink-0">{fmtTime(e.timestamp || e.created_at)}</span>
+                        <span className={cn('font-bold', evtColor(e.eventType || e.event_type))}>{e.eventType || e.event_type}</span>
+                        {(e.participantId || e.participant_id) && <span className="text-slate-600">{e.participantId || e.participant_id}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
       </div>
 
-      {/* Event list */}
-      <div className="card">
-        <div className="card-title">
-          <div className="card-title-left">Event Feed <span className="pill">{evts.length}</span></div>
-          <button className="btn btn-sm" onClick={loadEvents} disabled={loading}>
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="form-row" style={{ marginBottom: 14 }}>
-          <div className="form-group">
-            <label>Type</label>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+      {/* Event feed */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass">
+        <div className="flex items-center justify-between flex-wrap gap-3 px-5 pt-5 pb-4 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-semibold text-white">Event Feed</span>
+            <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-full">{evts.length}</span>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}
+              className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/40 transition-all"
+            >
               <option value="">All types</option>
               {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-          </div>
-          <div className="form-group">
-            <label>Session ID</label>
-            <input type="text" value={filterSession} onChange={e => setFilterSession(e.target.value)} placeholder="sess_..." />
-          </div>
-          <div className="form-group">
-            <label>Room ID</label>
-            <input type="text" value={filterRoom} onChange={e => setFilterRoom(e.target.value)} placeholder="room_..." />
+            <input type="text" value={filterSession} onChange={e => setFilterSession(e.target.value)} placeholder="Session..." className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-all w-32" />
+            <input type="text" value={filterRoom}    onChange={e => setFilterRoom(e.target.value)}    placeholder="Room..."    className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 transition-all w-32" />
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={loadEvents}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/10 text-slate-400 hover:text-white transition-all"
+            >
+              <RefreshCw className={cn('w-3 h-3', loading && 'animate-spin')} /> Refresh
+            </motion.button>
           </div>
         </div>
-
-        {evts.length === 0
-          ? <p className="empty-state">{loading ? 'Loading...' : 'No events found. Send a test event above.'}</p>
-          : (
-            <table className="tbl">
-              <thead>
-                <tr><th>Time</th><th>Type</th><th>Session</th><th>Room</th><th>Participant</th></tr>
-              </thead>
-              <tbody>
-                {evts.map((e, i) => (
-                  <tr key={e.id || i}>
-                    <td className="tbl-mono">{fmtTime(e.timestamp || e.created_at)}</td>
-                    <td>
-                      <span style={{ color: eventColor(e.eventType || e.event_type), fontWeight: 600, fontSize: 12 }}>
-                        {e.eventType || e.event_type || '—'}
-                      </span>
-                    </td>
-                    <td className="tbl-mono">{e.sessionId || e.session_id || '—'}</td>
-                    <td className="tbl-mono">{e.roomId    || e.room_id    || '—'}</td>
-                    <td className="tbl-mono">{e.participantId || e.participant_id || '—'}</td>
+        <div className="p-5">
+          {evts.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-slate-600">
+              <Activity className="w-9 h-9 opacity-25" />
+              <span className="text-sm">{loading ? 'Loading…' : 'No events found — send a test event above'}</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-white/[0.06]">
+                    {['Time','Type','Session','Room','Participant'].map(h => (
+                      <th key={h} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-3 pr-4">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        }
-      </div>
-
-      {/* Schema info */}
-      <div className="card">
-        <div className="card-title">PostgreSQL Schema</div>
-        <p className="card-subtitle">
-          Run <code style={{ background: 'var(--surface2)', padding: '1px 5px', borderRadius: 3 }}>psql -U postgres -d cxr -f server/db/schema.sql</code> to migrate.
-          Set <code style={{ background: 'var(--surface2)', padding: '1px 5px', borderRadius: 3 }}>DATABASE_URL</code> env var to enable PG; otherwise falls back to JSONL.
-        </p>
-        <div className="kv-row"><span className="kv-key">Tables</span><span className="kv-val">rooms, sessions, participants, runtime_events, interaction_events, calibration_events</span></div>
-        <div className="kv-row"><span className="kv-key">Append-first</span><span className="kv-val">No UPDATE on event tables — insert only</span></div>
-        <div className="kv-row"><span className="kv-key">JSONB metadata</span><span className="kv-val">Extensible payload column on runtime_events</span></div>
-        <div className="kv-row"><span className="kv-key">Indexed</span><span className="kv-val">room_id + timestamp, session_id + timestamp, event_type + timestamp</span></div>
-      </div>
-    </div>
+                </thead>
+                <tbody>
+                  <AnimatePresence>
+                    {evts.map((e, i) => (
+                      <motion.tr key={e.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.02, 0.4) }}
+                        className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+                      >
+                        <td className="py-3 pr-4 font-mono text-[11px] text-slate-500">{fmtTime(e.timestamp || e.created_at)}</td>
+                        <td className="py-3 pr-4">
+                          <span className={cn('text-[11px] font-bold', evtColor(e.eventType || e.event_type))}>
+                            {e.eventType || e.event_type || '—'}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 font-mono text-[11px] text-slate-500 max-w-[120px] truncate">{e.sessionId || e.session_id || '—'}</td>
+                        <td className="py-3 pr-4 font-mono text-[11px] text-slate-500 max-w-[100px] truncate">{e.roomId || e.room_id || '—'}</td>
+                        <td className="py-3 font-mono text-[11px] text-slate-500 max-w-[100px] truncate">{e.participantId || e.participant_id || '—'}</td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
