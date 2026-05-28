@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Boxes, Plus, RotateCcw, Square, FileText, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { Boxes, Plus, RotateCcw, Square, FileText, Users, Wifi, WifiOff, Package, AlertTriangle, RefreshCw } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogTerminal from '../components/LogTerminal.jsx';
-import { hm } from '../api/client.js';
+import { hm, buildsApi } from '../api/client.js';
 import { cn } from '../lib/utils.js';
 
-const page  = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
+const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
 
 function Btn({ onClick, disabled, loading, icon: Icon, children, variant = 'default', sm = false }) {
-  const v = { default: 'bg-white/[0.06] border-white/10 text-slate-300 hover:text-white hover:bg-white/10', primary: 'bg-blue-600 border-blue-500 text-white hover:bg-blue-500 shadow-glow-blue-sm', danger: 'bg-red-500/10 border-red-500/25 text-red-400 hover:bg-red-500/20' };
+  const v = {
+    default: 'bg-white/[0.06] border-white/10 text-slate-300 hover:text-white hover:bg-white/10',
+    primary: 'bg-blue-600 border-blue-500 text-white hover:bg-blue-500 shadow-glow-blue-sm',
+    danger:  'bg-red-500/10 border-red-500/25 text-red-400 hover:bg-red-500/20',
+  };
   return (
     <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onClick} disabled={disabled || loading}
       className={cn('flex items-center gap-1.5 font-semibold border rounded-lg transition-all', sm ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm', v[variant], (disabled || loading) && 'opacity-40 cursor-not-allowed')}
@@ -21,28 +25,73 @@ function Btn({ onClick, disabled, loading, icon: Icon, children, variant = 'defa
 }
 
 export default function Rooms() {
-  const [rooms,    setRooms]    = useState([]);
-  const [builds,   setBuilds]   = useState({});
-  const [registry, setRegistry] = useState(null);
-  const [roomLogs, setRoomLogs] = useState({});
-  const [busy,     setBusy]     = useState({});
-  const [toast,    setToast]    = useState(null);
-  const [form,     setForm]     = useState({ requestedName: 'Anatomy Lab', maxParticipants: 8, buildId: '' });
+  const [rooms,      setRooms]      = useState([]);
+  const [buildList,  setBuildList]  = useState([]);   // merged list of { id, name, path, executable }
+  const [registry,   setRegistry]   = useState(null);
+  const [roomLogs,   setRoomLogs]   = useState({});
+  const [busy,       setBusy]       = useState({});
+  const [toast,      setToast]      = useState(null);
+  const [form,       setForm]       = useState({ requestedName: 'Anatomy Lab', maxParticipants: 8, buildId: '' });
+  const [buildsLoading, setBuildsLoading] = useState(true);
+
+  const loadBuilds = useCallback(async () => {
+    setBuildsLoading(true);
+    try {
+      // Load from both sources and merge
+      const [hmRes, uploadRes] = await Promise.allSettled([hm.builds(), buildsApi.list()]);
+
+      const merged = {};
+
+      // From host manager discovery (/builds)
+      if (hmRes.status === 'fulfilled') {
+        const hmBuilds = hmRes.value.builds || {};
+        Object.entries(hmBuilds).forEach(([id, b]) => {
+          merged[id] = { id, name: b.name || id, path: b.path || '', executable: b.executable || '' };
+        });
+      }
+
+      // From upload API (/api/builds/list) — use folder name as ID
+      if (uploadRes.status === 'fulfilled') {
+        const uploaded = uploadRes.value.builds || [];
+        uploaded.forEach(b => {
+          const id = b.name;
+          if (!merged[id]) {
+            merged[id] = { id, name: b.name, path: b.path || '', executable: b.executable || '' };
+          }
+        });
+      }
+
+      const list = Object.values(merged);
+      setBuildList(list);
+
+      // Auto-select first build if nothing selected
+      setForm(f => ({ ...f, buildId: f.buildId || (list[0]?.id ?? '') }));
+    } finally {
+      setBuildsLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
-    const [r, b, reg] = await Promise.allSettled([hm.listRooms(), hm.builds(), hm.registryState()]);
+    const [r, reg] = await Promise.allSettled([hm.listRooms(), hm.registryState()]);
     if (r.status   === 'fulfilled') setRooms(r.value.rooms || []);
-    if (b.status   === 'fulfilled') setBuilds(b.value.builds || {});
     if (reg.status === 'fulfilled') setRegistry(reg.value);
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [load]);
+  useEffect(() => {
+    loadBuilds();
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [load, loadBuilds]);
 
   async function createRoom() {
     setBusy(b => ({ ...b, create: true }));
     try {
-      const payload = { ...form, maxParticipants: parseInt(form.maxParticipants, 10) };
-      if (!payload.buildId) delete payload.buildId;
+      const payload = {
+        requestedName:   form.requestedName,
+        maxParticipants: parseInt(form.maxParticipants, 10),
+        buildId:         form.buildId || undefined,
+      };
       await hm.createRoom(payload);
       flash('Room created successfully', 'success');
       load();
@@ -70,7 +119,8 @@ export default function Rooms() {
   }
 
   function flash(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); }
-  const buildOpts = Object.entries(builds);
+
+  const noBuilds = !buildsLoading && buildList.length === 0;
 
   return (
     <motion.div variants={page} initial="initial" animate="animate" exit="exit" className="p-8 max-w-7xl mx-auto">
@@ -93,7 +143,26 @@ export default function Rooms() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">Create and manage Unity multiplayer rooms</p>
         </div>
+        <Btn onClick={() => { loadBuilds(); load(); }} icon={RefreshCw} variant="default">Refresh</Btn>
       </div>
+
+      {/* No builds warning banner */}
+      <AnimatePresence>
+        {noBuilds && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400"
+          >
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-sm">No Unity builds found</div>
+              <div className="text-xs text-yellow-400/70 mt-0.5">
+                Upload a build on the <a href="/builds" className="underline underline-offset-2 hover:text-yellow-300">Build Upload</a> page,
+                or place your Unity Linux headless build folder inside <span className="font-mono">unity-builds/</span> on the server.
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Create Room */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass mb-6">
@@ -102,34 +171,98 @@ export default function Rooms() {
           <span className="text-sm font-semibold text-white">Create Room</span>
         </div>
         <div className="p-5">
-          <div className="flex flex-wrap gap-4 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+
+            {/* Room Name */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-slate-500">Room Name</label>
               <input type="text" value={form.requestedName}
                 onChange={e => setForm(f => ({ ...f, requestedName: e.target.value }))}
-                className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all w-48"
+                className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
               />
             </div>
+
+            {/* Max Players */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-slate-500">Max Players</label>
               <input type="number" min="1" max="32" value={form.maxParticipants}
                 onChange={e => setForm(f => ({ ...f, maxParticipants: e.target.value }))}
-                className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all w-28"
+                className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
               />
             </div>
-            {buildOpts.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500">Build</label>
-                <select value={form.buildId} onChange={e => setForm(f => ({ ...f, buildId: e.target.value }))}
-                  className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all"
-                >
-                  <option value="">Auto (first available)</option>
-                  {buildOpts.map(([id, b]) => <option key={id} value={id}>{b.name}</option>)}
-                </select>
-              </div>
-            )}
-            <Btn onClick={createRoom} loading={busy.create} icon={Plus} variant="primary">Create Room</Btn>
+
+            {/* Build selector — always visible */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                <Package className="w-3 h-3" /> Unity Build
+                {buildsLoading && <span className="text-[9px] text-slate-600 ml-auto">Loading…</span>}
+                {!buildsLoading && (
+                  <span className={cn('text-[9px] ml-auto font-bold', buildList.length > 0 ? 'text-emerald-400' : 'text-yellow-400')}>
+                    {buildList.length} available
+                  </span>
+                )}
+              </label>
+              <select
+                value={form.buildId}
+                onChange={e => setForm(f => ({ ...f, buildId: e.target.value }))}
+                disabled={buildsLoading || buildList.length === 0}
+                className={cn(
+                  'border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all',
+                  buildList.length === 0
+                    ? 'bg-yellow-500/5 border-yellow-500/25 text-yellow-500/60 cursor-not-allowed'
+                    : 'bg-white/[0.04] border-white/10 text-white',
+                )}
+              >
+                {buildList.length === 0 ? (
+                  <option value="">— No builds available —</option>
+                ) : (
+                  buildList.map(b => (
+                    <option key={b.id} value={b.id} className="bg-[#040810] text-white">
+                      {b.name}{b.executable ? ` ✓` : ' (no binary)'}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Create button */}
+            <div>
+              <Btn
+                onClick={createRoom}
+                loading={busy.create}
+                disabled={noBuilds || !form.requestedName.trim()}
+                icon={Plus}
+                variant="primary"
+              >
+                Create Room
+              </Btn>
+            </div>
           </div>
+
+          {/* Selected build detail */}
+          {form.buildId && buildList.length > 0 && (() => {
+            const selected = buildList.find(b => b.id === form.buildId);
+            if (!selected) return null;
+            return (
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-blue-500/5 border border-blue-500/15"
+              >
+                <Package className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-blue-300">{selected.name}</span>
+                  {selected.executable && (
+                    <span className="ml-2 text-[11px] text-emerald-400 font-mono">{selected.executable}</span>
+                  )}
+                  {!selected.executable && (
+                    <span className="ml-2 text-[11px] text-yellow-400">no .x86_64 binary detected</span>
+                  )}
+                  {selected.path && (
+                    <div className="text-[10px] font-mono text-slate-600 mt-0.5 truncate">{selected.path}</div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })()}
         </div>
       </motion.div>
 
@@ -155,16 +288,19 @@ export default function Rooms() {
                   transition={{ delay: i * 0.05 }}
                   className="glass group"
                 >
-                  {/* Room top */}
                   <div className="p-4 border-b border-white/[0.05]">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div>
                         <div className="text-sm font-bold text-white">{room.requestedName || room.roomId}</div>
                         <div className="text-[11px] font-mono text-slate-500 mt-0.5">{room.ip}:{room.port}</div>
+                        {room.buildId && (
+                          <div className="text-[10px] text-blue-400/70 mt-0.5 flex items-center gap-1">
+                            <Package className="w-2.5 h-2.5" /> {room.buildId}
+                          </div>
+                        )}
                       </div>
                       <StatusBadge status={room.status} />
                     </div>
-                    {/* Players bar */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] text-slate-500">
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Players</span>
@@ -172,22 +308,27 @@ export default function Rooms() {
                       </div>
                       <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
                         <motion.div
-                          initial={{ width: 0 }} animate={{ width: `${((room.playerCount ?? 0) / (room.maxParticipants || 1)) * 100}%` }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${((room.playerCount ?? 0) / (room.maxParticipants || 1)) * 100}%` }}
                           transition={{ duration: 0.6, ease: 'easeOut' }}
                           className="h-full bg-blue-500 rounded-full"
                         />
                       </div>
                     </div>
                   </div>
-                  {/* Room actions */}
                   <div className="flex gap-2 p-3 flex-wrap">
                     <Btn onClick={() => restartRoom(room.roomId)} loading={busy[room.roomId] === 'restart'} icon={RotateCcw} sm>Restart</Btn>
                     <Btn onClick={() => stopRoom(room.roomId)}    loading={busy[room.roomId] === 'stop'}    icon={Square}    sm variant="danger">Stop</Btn>
-                    <Btn onClick={() => roomLogs[room.roomId] ? setRoomLogs(p => { const n = {...p}; delete n[room.roomId]; return n; }) : loadRoomLogs(room.roomId)} icon={FileText} sm>
+                    <Btn
+                      onClick={() => roomLogs[room.roomId]
+                        ? setRoomLogs(p => { const n = { ...p }; delete n[room.roomId]; return n; })
+                        : loadRoomLogs(room.roomId)
+                      }
+                      icon={FileText} sm
+                    >
                       {roomLogs[room.roomId] ? 'Hide' : 'Logs'}
                     </Btn>
                   </div>
-                  {/* Logs inline */}
                   <AnimatePresence>
                     {roomLogs[room.roomId] && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden px-3 pb-3">
@@ -226,9 +367,13 @@ export default function Rooms() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="text-left border-b border-white/[0.06]">
-                    {['Name','IP:Port','Players','Status'].map(h => <th key={h} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-3 pr-4">{h}</th>)}
-                  </tr></thead>
+                  <thead>
+                    <tr className="text-left border-b border-white/[0.06]">
+                      {['Name', 'IP:Port', 'Players', 'Status'].map(h => (
+                        <th key={h} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-3 pr-4">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
                   <tbody>
                     {registry.rooms.map(r => (
                       <tr key={r.roomId} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
