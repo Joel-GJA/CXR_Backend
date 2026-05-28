@@ -7,32 +7,30 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('cxr_token');
-    setUser(null);
-  }, []);
-
-  // Verify token on mount
+  // Check existing session on mount (cookie sent automatically)
   useEffect(() => {
-    const token = localStorage.getItem('cxr_token');
-    if (!token) { setLoading(false); return; }
     auth.me()
       .then(data => setUser(data.user))
-      .catch(() => { localStorage.removeItem('cxr_token'); })
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
 
-  // Listen for 401 dispatched by fetchJson
-  useEffect(() => {
-    window.addEventListener('cxr:logout', logout);
-    return () => window.removeEventListener('cxr:logout', logout);
-  }, [logout]);
-
   const login = useCallback(async (username, password) => {
     const data = await auth.login(username, password);
-    localStorage.setItem('cxr_token', data.token);
     setUser(data.user);
     return data.user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try { await auth.logout(); } catch (_) {}
+    setUser(null);
+  }, []);
+
+  // Listen for 401 events dispatched by fetchJson
+  useEffect(() => {
+    const handle = () => setUser(null);
+    window.addEventListener('cxr:logout', handle);
+    return () => window.removeEventListener('cxr:logout', handle);
   }, []);
 
   return (

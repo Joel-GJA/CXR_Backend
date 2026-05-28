@@ -1,11 +1,12 @@
-const express    = require('express');
-const http       = require('http');
-const path       = require('path');
-const fs         = require('fs');
-const cors       = require('cors');
-const config     = require('./config');
-const jwtAuth    = require('./auth/jwt');
-const userStore  = require('./auth/users');
+const express      = require('express');
+const http         = require('http');
+const path         = require('path');
+const fs           = require('fs');
+const cors         = require('cors');
+const cookieParser = require('cookie-parser');
+const config       = require('./config');
+const jwtAuth      = require('./auth/jwt');
+const userStore    = require('./auth/users');
 
 // ── Ash's host-manager modules (integrated directly) ─────────────────────────
 const ProcessManager     = require('./hm/processManager');
@@ -43,12 +44,13 @@ const recentRequests = [];
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: '2mb' }));
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
-  // Accept legacy static token (for Unity / external API clients)
+  // 1. Legacy static token — for Unity / external API clients
   if (config.adminToken) {
     const hdr = req.headers['x-cxr-admin-token'];
     if (typeof hdr === 'string' && hdr === config.adminToken) {
@@ -56,22 +58,19 @@ function authMiddleware(req, res, next) {
       return next();
     }
   }
-  // JWT from panel login
-  const token = jwtAuth.extractBearer(req);
-  if (token) {
-    const payload = jwtAuth.verify(token);
+  // 2. httpOnly session cookie (panel users)
+  const cookieToken = req.cookies?.cxr_session;
+  if (cookieToken) {
+    const payload = jwtAuth.verify(cookieToken);
+    if (payload) { req.user = { username: payload.username, role: payload.role }; return next(); }
+  }
+  // 3. Bearer token fallback (for API scripts)
+  const bearer = jwtAuth.extractBearer(req);
+  if (bearer) {
+    const payload = jwtAuth.verify(bearer);
     if (payload) { req.user = { username: payload.username, role: payload.role }; return next(); }
   }
   return res.status(401).json({ error: 'unauthorized' });
-}
-
-function requireRole(...roles) {
-  return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: `Requires role: ${roles.join(' or ')}` });
-    }
-    next();
-  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -311,10 +310,11 @@ app.get('/api/logs/services/:id', authMiddleware, (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-// AUTH (login is public; all other /api/auth/* require JWT)
+// AUTH (login + logout are public; everything else requires session)
 // ────────────────────────────────────────────────────────────────────────────
 app.use('/api/auth', (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/login') return next();
+  const publicPaths = ['/login', '/logout'];
+  if (publicPaths.includes(req.path)) return next();
   return authMiddleware(req, res, next);
 }, require('./routes/auth'));
 

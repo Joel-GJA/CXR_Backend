@@ -162,26 +162,47 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-white/5 p-2 space-y-0.5">
-          {/* User info */}
-          {user && !collapsed && (
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/5 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400 flex-shrink-0">
-                {user.username[0].toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-white truncate">{user.username}</div>
-                <span className={cn('text-[9px] font-bold uppercase tracking-wider border rounded-full px-1.5 py-0.5', ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
-                  {user.role}
-                </span>
-              </div>
-            </div>
-          )}
-          {user && collapsed && (
-            <div className="flex justify-center py-1">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400">
-                {user.username[0].toUpperCase()}
-              </div>
+        <div className="border-t border-white/5 p-2 space-y-1">
+
+          {/* User card + logout */}
+          {user && (
+            <div className={cn(
+              'rounded-xl border border-white/[0.07] bg-white/[0.03] overflow-hidden mb-1',
+              collapsed && 'flex justify-center items-center p-2',
+            )}>
+              {!collapsed ? (
+                <>
+                  {/* User info row */}
+                  <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-700/20 border border-blue-500/25 flex items-center justify-center text-sm font-bold text-blue-300 flex-shrink-0">
+                      {user.username[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-semibold text-white truncate leading-tight">{user.username}</div>
+                      <span className={cn('text-[9px] font-bold uppercase tracking-widest border rounded-full px-1.5 py-0.5', ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
+                        {user.role}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Logout button — full width, clearly red */}
+                  <motion.button
+                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}
+                    onClick={logout}
+                    className="flex items-center justify-center gap-2 w-full px-3 py-2 text-[12px] font-semibold text-red-400 hover:bg-red-500/10 border-t border-white/[0.05] transition-all"
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> Sign out
+                  </motion.button>
+                </>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.93 }}
+                  onClick={logout}
+                  title="Sign out"
+                  className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-all"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </motion.button>
+              )}
             </div>
           )}
 
@@ -190,37 +211,18 @@ export default function Layout({ children }) {
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={toggle}
             className={cn(
-              'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all border border-transparent',
+              'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all',
               collapsed && 'justify-center',
             )}
           >
             {isDark
-              ? <Sun className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-              : <Moon className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              ? <Sun  className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+              : <Moon className="w-4 h-4 text-blue-400  flex-shrink-0" />
             }
             <AnimatePresence>
               {!collapsed && (
                 <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   {isDark ? 'Light Mode' : 'Dark Mode'}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-
-          {/* Logout */}
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={logout}
-            className={cn(
-              'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] text-slate-400 hover:text-red-400 hover:bg-red-500/[0.06] transition-all border border-transparent',
-              collapsed && 'justify-center',
-            )}
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0" />
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  Sign out
                 </motion.span>
               )}
             </AnimatePresence>
