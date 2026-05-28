@@ -53,9 +53,12 @@ export function AnimatedThemeToggler({
   ...props
 }) {
   const { isDark, toggle } = useTheme();
-  const ref = useRef(null);
+  const ref         = useRef(null);
+  const inFlightRef = useRef(false);
 
   const handleToggle = useCallback(() => {
+    // Ignore clicks while a transition is still running — prevents data-attr races
+    if (inFlightRef.current) return;
     const btn = ref.current;
     if (!btn) { toggle(); return; }
 
@@ -79,11 +82,13 @@ export function AnimatedThemeToggler({
     root.style.setProperty('--magicui-theme-vt-clip-from', from);
 
     const cleanup = () => {
+      inFlightRef.current = false;
       delete root.dataset.magicuiThemeVt;
       root.style.removeProperty('--magicui-theme-toggle-vt-duration');
       root.style.removeProperty('--magicui-theme-vt-clip-from');
     };
 
+    inFlightRef.current = true;
     const transition = document.startViewTransition(() => { flushSync(toggle); });
     transition?.finished?.finally?.(cleanup);
     transition?.ready?.then?.(() => {

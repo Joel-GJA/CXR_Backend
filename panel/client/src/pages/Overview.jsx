@@ -11,6 +11,7 @@ import { hm, events } from '../api/client.js';
 import { useRealtime }     from '../contexts/RealtimeContext.jsx';
 import { WordRotate }      from '../components/ui/word-rotate.jsx';
 import { ScrollVelocityContainer, ScrollVelocityRow } from '../components/ui/scroll-based-velocity.jsx';
+import { SparklesCore }    from '../components/ui/sparkles.jsx';
 import { cn } from '../lib/utils.js';
 
 function useCountUp(target, dur = 900) {
@@ -139,8 +140,19 @@ export default function Overview() {
     <motion.div variants={page} initial="initial" animate="animate" exit="exit" className="p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Overview</h1>
+        <div className="relative">
+          {/* Subtle sparkles behind the title */}
+          <div className="absolute -inset-x-4 -top-2 h-12 pointer-events-none opacity-60 dark:opacity-100">
+            <SparklesCore
+              background="transparent"
+              minSize={0.3}
+              maxSize={0.9}
+              particleDensity={500}
+              particleColor="#06b6d4"
+              className="w-full h-full"
+            />
+          </div>
+          <h1 className="relative text-2xl font-bold tracking-tight text-white">Overview</h1>
           <div className="text-sm text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
             <span>Live</span>
             <WordRotate

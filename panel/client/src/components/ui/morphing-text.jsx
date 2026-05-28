@@ -15,11 +15,13 @@ function useMorphingText(texts) {
   const setStyles = useCallback((fraction) => {
     const [c1, c2] = [text1Ref.current, text2Ref.current];
     if (!c1 || !c2) return;
-    c2.style.filter  = `blur(${Math.min(8 / fraction - 8, 100)}px)`;
+    // Guard against fraction=0 (or 1) producing Infinity in 8/x
+    const safe2 = Math.max(fraction, 0.0001);
+    c2.style.filter  = `blur(${Math.min(8 / safe2 - 8, 100)}px)`;
     c2.style.opacity = `${Math.pow(fraction, 0.4) * 100}%`;
-    const inv = 1 - fraction;
+    const inv = Math.max(1 - fraction, 0.0001);
     c1.style.filter  = `blur(${Math.min(8 / inv - 8, 100)}px)`;
-    c1.style.opacity = `${Math.pow(inv, 0.4) * 100}%`;
+    c1.style.opacity = `${Math.pow(1 - fraction, 0.4) * 100}%`;
     c1.textContent = texts[textIndexRef.current % texts.length];
     c2.textContent = texts[(textIndexRef.current + 1) % texts.length];
   }, [texts]);

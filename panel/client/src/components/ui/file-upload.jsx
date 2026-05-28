@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileArchive, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { UploadCloud } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
 
 const mainVariant = {
@@ -14,146 +14,147 @@ const secondaryVariant = {
 };
 
 /**
- * Aceternity-style file upload.
- * - Animated dot-grid background
- * - Drag-and-drop OR click to browse
- * - Tilt + lift animation when a file is hovered over the zone
- * - Selected file appears as a sleek floating card
+ * Aceternity-style file upload — multi-file with animated stacked cards.
+ * Pass onChange(files) — receives an array of File objects.
+ *
+ * `multiple` (default true) — if false, each selection REPLACES the previous file.
+ * `resetKey` — change this prop to force-clear the internal file list (e.g. after
+ *   a successful upload, parent increments resetKey to wipe stale file cards).
  */
-export function FileUpload({
-  onChange,
-  accept   = '*',
-  file     = null,
-  onClear,
-  className,
-}) {
-  const inputRef = useRef(null);
+export function FileUpload({ onChange, accept = '*', multiple = true, resetKey, className }) {
+  const [files, setFiles] = useState([]);
   const [hovering, setHovering] = useState(false);
+  const inputRef = useRef(null);
 
-  const handleFiles = (f) => { if (f) onChange?.(f); };
+  // Wipe internal state when parent signals reset
+  React.useEffect(() => { setFiles([]); }, [resetKey]);
+
+  const handleFileChange = (newFiles) => {
+    const next = multiple ? [...files, ...newFiles] : newFiles.slice(-1);
+    setFiles(next);
+    onChange?.(next);
+  };
+
+  const handleClick = () => inputRef.current?.click();
 
   return (
     <div className={cn('w-full', className)}>
       <motion.div
-        onClick={() => !file && inputRef.current?.click()}
+        onClick={handleClick}
+        whileHover="animate"
         onDragOver={(e) => { e.preventDefault(); setHovering(true); }}
         onDragLeave={() => setHovering(false)}
         onDrop={(e) => {
           e.preventDefault();
           setHovering(false);
-          handleFiles(e.dataTransfer.files?.[0]);
+          handleFileChange(Array.from(e.dataTransfer.files || []));
         }}
-        whileHover={file ? {} : 'animate'}
-        className={cn(
-          'relative group/upload p-10 rounded-2xl cursor-pointer overflow-hidden transition-all duration-300',
-          'border border-dashed',
-          hovering
-            ? 'border-cyan-400/70 bg-cyan-500/[0.08]'
-            : file
-              ? 'border-emerald-500/40 bg-emerald-500/[0.04] cursor-default'
-              : 'border-slate-400/20 dark:border-white/10 bg-white dark:bg-white/[0.02] hover:border-blue-500/40',
-        )}
+        className="p-10 group/file block rounded-lg cursor-pointer w-full relative overflow-hidden"
       >
         <input
           ref={inputRef}
           type="file"
           accept={accept}
+          multiple
+          onChange={(e) => handleFileChange(Array.from(e.target.files || []))}
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files?.[0])}
         />
 
-        {/* Animated grid background */}
-        <GridPattern active={hovering || !!file} />
-
-        <div className="relative flex flex-col items-center justify-center gap-4 z-10">
-          <p className={cn(
-            'font-bold text-base',
-            file ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-100',
-          )}>
-            {file ? 'Ready to upload' : hovering ? 'Drop your build here' : 'Upload Unity build'}
+        <div className="flex flex-col items-center justify-center relative z-10">
+          <p className="font-bold text-slate-700 dark:text-slate-200 text-base">
+            Upload build
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-xs">
-            {file
-              ? 'Click upload to extract this archive into the builds directory'
-              : <>Drag and drop your build archive, or <span className="text-blue-500 dark:text-blue-400 font-semibold">click to browse</span></>
-            }
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
+            Drag and drop your archive here, or click to browse
           </p>
 
-          <div className="relative w-full mt-4 max-w-xl mx-auto">
-            <AnimatePresence mode="wait">
-              {file ? (
+          <div className="relative w-full mt-10 max-w-xl mx-auto">
+            {/* Selected file cards stack */}
+            {files.length > 0 &&
+              files.map((file, idx) => (
                 <motion.div
-                  key="file"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="relative overflow-hidden flex items-center gap-3 z-30 bg-white dark:bg-[#0a1120] flex-row rounded-xl px-4 py-3 mx-auto w-full max-w-md shadow-[0_4px_24px_rgba(59,130,246,0.18)] border border-cyan-500/30"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
-                    <FileArchive className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <motion.p
-                      layout
-                      className="text-sm font-semibold text-slate-900 dark:text-white truncate"
-                    >
-                      {file.name}
-                    </motion.p>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                      </span>
-                      <span className="text-[11px] font-mono text-blue-500 dark:text-cyan-400/80">
-                        {(file.type || file.name.split('.').slice(-2).join('.')).slice(0, 30) || 'archive'}
-                      </span>
-                    </div>
-                  </div>
-                  {onClear && (
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.94 }}
-                      onClick={(e) => { e.stopPropagation(); onClear(); }}
-                      className="flex-shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                    </motion.button>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="cta"
-                  layoutId="file-upload-cta"
-                  variants={mainVariant}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  key={'file' + idx}
+                  layoutId={idx === 0 ? 'file-upload' : 'file-upload-' + idx}
                   className={cn(
-                    'relative group-hover/upload:shadow-xl z-40 bg-white dark:bg-[#0a1120] flex items-center justify-center h-20 mt-4 w-full max-w-[8rem] mx-auto rounded-md',
-                    'shadow-[0_0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.05)]',
-                    'dark:shadow-[0_0_1px_3px_rgba(255,255,255,0.04)]',
+                    'relative overflow-hidden z-40 bg-white dark:bg-neutral-900 flex flex-col items-start justify-start md:h-24 p-4 mt-4 w-full mx-auto rounded-md',
+                    'shadow-[0_0_1px_3px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.05)]',
+                    'dark:shadow-[0_0_1px_3px_rgba(6,182,212,0.15)]',
                   )}
                 >
-                  {hovering ? (
+                  <div className="flex justify-between w-full items-center gap-4">
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="text-slate-500 dark:text-slate-400 flex flex-col items-center gap-1"
+                      layout
+                      className="text-base text-slate-700 dark:text-slate-100 truncate max-w-xs font-semibold"
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Drop</span>
-                      <UploadCloud className="w-5 h-5" />
+                      {file.name}
                     </motion.p>
-                  ) : (
-                    <UploadCloud className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                  )}
-                </motion.div>
-              )}
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      layout
+                      className="rounded-lg px-2 py-1 w-fit flex-shrink-0 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/[0.06] shadow-input"
+                    >
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB
+                    </motion.p>
+                  </div>
 
-              {!file && (
-                <motion.div
-                  key="cta-shadow"
-                  variants={secondaryVariant}
-                  className="absolute opacity-0 border border-dashed border-cyan-400/60 inset-0 z-30 bg-transparent flex items-center justify-center h-20 mt-4 w-full max-w-[8rem] mx-auto rounded-md"
-                />
-              )}
-            </AnimatePresence>
+                  <div className="flex text-sm md:flex-row flex-col items-start md:items-center w-full mt-2 justify-between text-slate-500 dark:text-slate-400">
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      layout
+                      className="px-1 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.04] font-mono text-xs"
+                    >
+                      {file.type || file.name.split('.').slice(-2).join('.')}
+                    </motion.p>
+
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      layout
+                      className="text-xs"
+                    >
+                      modified {new Date(file.lastModified).toLocaleDateString()}
+                    </motion.p>
+                  </div>
+                </motion.div>
+              ))}
+
+            {/* Centered upload tile */}
+            {!files.length && (
+              <motion.div
+                layoutId="file-upload"
+                variants={mainVariant}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className={cn(
+                  'relative group-hover/file:shadow-2xl z-40 bg-white dark:bg-neutral-900 flex items-center justify-center h-32 mt-4 w-full max-w-[8rem] mx-auto rounded-md',
+                  'shadow-[0_0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.05)]',
+                  'dark:shadow-[0_0_1px_3px_rgba(255,255,255,0.04)]',
+                )}
+              >
+                {hovering ? (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-slate-600 dark:text-slate-300 flex flex-col items-center gap-1"
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Drop</span>
+                    <UploadCloud className="w-5 h-5 text-cyan-500" />
+                  </motion.p>
+                ) : (
+                  <UploadCloud className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                )}
+              </motion.div>
+            )}
+
+            {!files.length && (
+              <motion.div
+                variants={secondaryVariant}
+                className="absolute opacity-0 border border-dashed border-cyan-400/60 inset-0 z-30 bg-transparent flex items-center justify-center h-32 mt-4 w-full max-w-[8rem] mx-auto rounded-md"
+              />
+            )}
           </div>
         </div>
       </motion.div>
@@ -161,31 +162,3 @@ export function FileUpload({
   );
 }
 
-function GridPattern({ active }) {
-  const columns = 41;
-  const rows    = 11;
-  return (
-    <div className="pointer-events-none absolute inset-0 flex flex-shrink-0 flex-wrap justify-center items-center gap-x-px gap-y-px scale-105">
-      {Array.from({ length: rows }).map((_, row) =>
-        Array.from({ length: columns }).map((_, col) => {
-          const index = row * columns + col;
-          return (
-            <div
-              key={`${col}-${row}`}
-              className={cn(
-                'w-10 h-10 flex shrink-0 rounded-[2px]',
-                active
-                  ? (index % 2 === 0
-                      ? 'bg-cyan-400/[0.04] dark:bg-cyan-400/[0.06]'
-                      : 'bg-blue-500/[0.04] dark:bg-blue-500/[0.06] shadow-[0_0_1px_3px_rgba(6,182,212,0.05)_inset]')
-                  : (index % 2 === 0
-                      ? 'bg-slate-200/30 dark:bg-white/[0.015]'
-                      : 'bg-slate-100/40 dark:bg-white/[0.025] shadow-[0_0_1px_3px_rgba(255,255,255,0.04)_inset]'),
-              )}
-            />
-          );
-        }),
-      )}
-    </div>
-  );
-}

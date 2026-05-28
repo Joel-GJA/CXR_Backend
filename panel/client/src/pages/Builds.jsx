@@ -113,6 +113,7 @@ export default function Builds() {
   const [uploading, setUploading] = useState(false);
   const [progress,  setProgress]  = useState(0);
   const [toasts,    setToasts]    = useState([]);
+  const [resetKey,  setResetKey]  = useState(0);
   let toastId = useRef(0);
 
   const toast = (msg, type = 'success') => {
@@ -143,6 +144,7 @@ export default function Builds() {
       toast(result.message || 'Build uploaded successfully!');
       setFile(null);
       setProgress(0);
+      setResetKey(k => k + 1);  // clear file cards inside FileUpload
       await loadBuilds();
     } catch (e) {
       toast(e.message, 'error');
@@ -183,17 +185,20 @@ export default function Builds() {
       </div>
 
       {/* Aceternity-style drop zone */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="w-full mx-auto min-h-96 border border-dashed bg-white dark:bg-black border-slate-200 dark:border-neutral-800 rounded-lg mb-6"
+      >
         <FileUpload
           accept={ACCEPTED}
-          file={file}
-          onChange={setFile}
-          onClear={() => setFile(null)}
+          multiple={false}
+          resetKey={resetKey}
+          onChange={(files) => setFile(files[0] || null)}
         />
-        <p className="text-[11px] text-center text-slate-500 mt-3">
-          Supports <span className="text-blue-400">.zip · .rar · .tar.gz · .tar</span>
-        </p>
       </motion.div>
+      <p className="text-[11px] text-center text-slate-500 -mt-3 mb-6">
+        Supports <span className="text-blue-400">.zip · .rar · .tar.gz · .tar</span>
+      </p>
 
       {/* Action row */}
       <AnimatePresence>
@@ -219,7 +224,7 @@ export default function Builds() {
             {!uploading && (
               <motion.button
                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                onClick={() => setFile(null)}
+                onClick={() => { setFile(null); setResetKey(k => k + 1); }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white/[0.04] border-white/10 text-slate-400 hover:text-white transition-all"
               >
                 <X className="w-3.5 h-3.5" /> Clear

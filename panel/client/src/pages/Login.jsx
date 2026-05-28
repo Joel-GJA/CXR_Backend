@@ -4,6 +4,7 @@ import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { Meteors }      from '../components/ui/meteors.jsx';
 import { MorphingText } from '../components/ui/morphing-text.jsx';
+import { SparklesCore } from '../components/ui/sparkles.jsx';
 import { cn } from '../lib/utils.js';
 
 const ROLE_COLORS = { admin: 'text-blue-400', operator: 'text-emerald-400', viewer: 'text-yellow-400' };
@@ -69,6 +70,27 @@ export default function Login() {
               texts={['Backend Panel', 'Operations Hub', 'XR Multiplayer', 'Real-time Ops']}
               className="h-10 text-[22px] text-cyan-300/90 tracking-wide"
             />
+          </div>
+
+          {/* Sparkles strip with gradient lines */}
+          <div className="w-full h-24 relative -mt-2">
+            {/* Cyan/indigo gradient lines */}
+            <div className="absolute inset-x-12 top-0 bg-gradient-to-r from-transparent via-indigo-500 to-transparent h-[2px] w-3/4 mx-auto blur-sm" />
+            <div className="absolute inset-x-12 top-0 bg-gradient-to-r from-transparent via-indigo-500 to-transparent h-px w-3/4 mx-auto" />
+            <div className="absolute inset-x-24 top-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent h-[5px] w-1/2 mx-auto blur-sm" />
+            <div className="absolute inset-x-24 top-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent h-px w-1/2 mx-auto" />
+
+            <SparklesCore
+              background="transparent"
+              minSize={0.4}
+              maxSize={1}
+              particleDensity={900}
+              particleColor="#67e8f9"
+              className="w-full h-full"
+            />
+
+            {/* Radial mask to soften edges */}
+            <div className="absolute inset-0 w-full h-full bg-black [mask-image:radial-gradient(220px_120px_at_top,transparent_20%,white)]" />
           </div>
         </div>
 

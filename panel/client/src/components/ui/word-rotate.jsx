@@ -16,7 +16,9 @@ export function WordRotate({
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (!words || words.length <= 1) return;
+    if (!words || words.length === 0) return;
+    setIndex(0);  // reset when words array changes so we don't render a stale index
+    if (words.length <= 1) return;
     const t = setInterval(() => setIndex(i => (i + 1) % words.length), duration);
     return () => clearInterval(t);
   }, [words, duration]);

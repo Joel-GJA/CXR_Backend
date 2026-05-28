@@ -3,12 +3,14 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 const RealtimeCtx = createContext({ subscribe: () => () => {}, connected: false, reconnect: () => {} });
 
 export function RealtimeProvider({ children }) {
-  const wsRef     = useRef(null);
-  const listenRef = useRef(new Map()); // type → Set<callback>
-  const reconnRef = useRef(null);
+  const wsRef       = useRef(null);
+  const listenRef   = useRef(new Map()); // type → Set<callback>
+  const reconnRef   = useRef(null);
+  const unmountedRef = useRef(false);
   const [connected, setConnected] = useState(false);
 
   const connect = useCallback(() => {
+    if (unmountedRef.current) return;          // don't reconnect after unmount
     clearTimeout(reconnRef.current);
     if (wsRef.current && wsRef.current.readyState < 2) wsRef.current.close();
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -17,7 +19,7 @@ export function RealtimeProvider({ children }) {
     ws.onopen  = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      reconnRef.current = setTimeout(connect, 3000);
+      if (!unmountedRef.current) reconnRef.current = setTimeout(connect, 3000);
     };
     ws.onerror = () => {};
     ws.onmessage = ({ data }) => {
@@ -30,8 +32,13 @@ export function RealtimeProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    unmountedRef.current = false;
     connect();
-    return () => { clearTimeout(reconnRef.current); wsRef.current?.close(); };
+    return () => {
+      unmountedRef.current = true;             // block the onclose reconnect
+      clearTimeout(reconnRef.current);
+      if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); }
+    };
   }, [connect]);
 
   const subscribe = useCallback((type, cb) => {

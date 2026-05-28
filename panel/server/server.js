@@ -382,7 +382,7 @@ processManager.on('status', (status) => {
 processManager.on('metrics', (m) => logWsServer.broadcastMessage({ type: 'metrics', ...m }));
 
 // Push a full state snapshot to all WS clients every 2 seconds
-setInterval(pushState, 2000);
+const stateBroadcastInterval = setInterval(pushState, 2000);
 
 // Record request activity
 app.use((req, _res, next) => {
@@ -495,6 +495,7 @@ function getAvailableIPs() {
 // ────────────────────────────────────────────────────────────────────────────
 async function shutdown() {
   console.log('\n[Panel] Shutting down...');
+  clearInterval(stateBroadcastInterval);
   processManager.setCrashRecovery(false);
   processManager.shutdown();
   roomManager.shutdown();

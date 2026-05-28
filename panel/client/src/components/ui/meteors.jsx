@@ -13,14 +13,18 @@ export function Meteors({
   const [meteorStyles, setMeteorStyles] = useState([]);
 
   useEffect(() => {
-    const styles = Array.from({ length: number }, () => ({
+    const compute = () => Array.from({ length: number }, () => ({
       top:             '-5%',
       left:            `${Math.floor(Math.random() * window.innerWidth)}px`,
       animationDelay:  `${(Math.random() * (maxDelay - minDelay) + minDelay).toFixed(2)}s`,
       animationDuration: `${Math.floor(Math.random() * (maxDuration - minDuration) + minDuration)}s`,
       '--meteor-angle': `-${angle}deg`,
     }));
-    setMeteorStyles(styles);
+    setMeteorStyles(compute());
+    // Recompute meteor positions on window resize so they don't drift offscreen
+    const onResize = () => setMeteorStyles(compute());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [number, minDelay, maxDelay, minDuration, maxDuration, angle]);
 
   return (
