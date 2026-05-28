@@ -67,17 +67,18 @@ function scanUnityBuilds(buildsDir) {
   return builds;
 }
 
-const logsDir    = path.resolve(__dirname, process.env.CXR_LOGS_DIRECTORY    || './logs');
-const buildsDir  = path.resolve(__dirname, process.env.CXR_UNITY_BUILDS_DIRECTORY || './unity-builds');
-const scannedBuilds = scanUnityBuilds(buildsDir);
+const logsDir   = path.resolve(__dirname, process.env.CXR_LOGS_DIRECTORY           || './logs');
+const buildsDir = path.resolve(__dirname, process.env.CXR_UNITY_BUILDS_DIRECTORY   || './unity-builds');
 
-if (Object.keys(scannedBuilds).length > 0) {
-  console.log(`[config] Found ${Object.keys(scannedBuilds).length} Unity build(s) in ${buildsDir}:`, Object.keys(scannedBuilds));
+let _builds = scanUnityBuilds(buildsDir);
+
+if (Object.keys(_builds).length > 0) {
+  console.log(`[config] Found ${Object.keys(_builds).length} Unity build(s) in ${buildsDir}:`, Object.keys(_builds));
 } else {
-  console.warn(`[config] No Unity builds found in ${buildsDir}. Create a subdirectory with a .x86_64 binary to register a build.`);
+  console.warn(`[config] No Unity builds found in ${buildsDir}. Upload a build or place a subdirectory with a .x86_64 binary.`);
 }
 
-module.exports = {
+const cfg = {
   // ── Panel ──────────────────────────────────────────────────────────────────
   port:        parseInt(process.env.PANEL_PORT || '4000', 10),
   adminToken:  process.env.CXR_ADMIN_TOKEN || '',
@@ -85,7 +86,7 @@ module.exports = {
   // ── Host Manager (integrated) ─────────────────────────────────────────────
   publicAddress:  resolvePublicAddress(),
   logsDirectory:  logsDir,
-  hostManagerPort: parseInt(process.env.PANEL_PORT || '4000', 10),  // same server
+  hostManagerPort: parseInt(process.env.PANEL_PORT || '4000', 10),
   roomPortRange: {
     start: parseInt(process.env.CXR_ROOM_PORT_START || '7777', 10),
     end:   parseInt(process.env.CXR_ROOM_PORT_END   || '7900', 10),
@@ -110,7 +111,17 @@ module.exports = {
   flushIntervalMs: parseInt(process.env.FLUSH_INTERVAL_MS || '2000', 10),
   maxBatchSize:    parseInt(process.env.MAX_BATCH_SIZE    || '100',  10),
 
-  // ── Unity builds (auto-scanned from unity-builds/ or CXR_UNITY_BUILDS_DIRECTORY) ──
-  builds:     scannedBuilds,
+  // ── Unity builds — use getter so it always reflects the latest rescan ──────
+  get builds() { return _builds; },
   buildsDir,
+
+  // Re-scan unity-builds/ directory and update the live builds map
+  rescanBuilds() {
+    _builds = scanUnityBuilds(buildsDir);
+    const count = Object.keys(_builds).length;
+    console.log(`[config] rescan: ${count} build(s) found:`, Object.keys(_builds));
+    return _builds;
+  },
 };
+
+module.exports = cfg;

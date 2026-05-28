@@ -85,7 +85,18 @@ router.post('/upload', upload.single('build'), async (req, res) => {
       await execCmd(`find "${destDir}" -name "*.x86_64" -o -name "*.x86" | xargs -r chmod +x`);
     } catch (_) {}
 
-    res.json({ ok: true, buildName, message: `Build "${buildName}" extracted and ready.` });
+    // Refresh the live build registry so new build is immediately available
+    const freshBuilds = config.rescanBuilds();
+    const normalizedId = buildName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    const registered = !!freshBuilds[normalizedId];
+
+    res.json({
+      ok: true,
+      buildName,
+      buildId: normalizedId,
+      registered,
+      message: `Build "${buildName}" extracted and ready.${registered ? '' : ' No .x86_64 binary found — build ID not registered.'}`,
+    });
   } catch (err) {
     cleanupAll();
     res.status(500).json({ ok: false, error: err.message });
@@ -121,6 +132,7 @@ router.delete('/:name', (req, res) => {
   }
   try {
     fs.rmSync(dir, { recursive: true, force: true });
+    config.rescanBuilds();
     res.json({ ok: true, message: `Build "${name}" deleted.` });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

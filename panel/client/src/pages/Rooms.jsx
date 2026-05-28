@@ -8,6 +8,9 @@ import { cn } from '../lib/utils.js';
 
 const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
 
+// Must match config.js: entry.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+const normalizeId = name => name.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+
 function Btn({ onClick, disabled, loading, icon: Icon, children, variant = 'default', sm = false }) {
   const v = {
     default: 'bg-white/[0.06] border-white/10 text-slate-300 hover:text-white hover:bg-white/10',
@@ -31,41 +34,57 @@ export default function Rooms() {
   const [roomLogs,   setRoomLogs]   = useState({});
   const [busy,       setBusy]       = useState({});
   const [toast,      setToast]      = useState(null);
-  const [form,       setForm]       = useState({ requestedName: 'Anatomy Lab', maxParticipants: 8, buildId: '' });
+  const [form,       setForm]       = useState({ requestedName: 'CXR_room_1', maxParticipants: 8, buildId: '' });
   const [buildsLoading, setBuildsLoading] = useState(true);
 
   const loadBuilds = useCallback(async () => {
     setBuildsLoading(true);
     try {
-      // Load from both sources and merge
       const [hmRes, uploadRes] = await Promise.allSettled([hm.builds(), buildsApi.list()]);
 
       const merged = {};
 
-      // From host manager discovery (/builds)
+      // HM builds are authoritative — IDs here are guaranteed valid for room creation
       if (hmRes.status === 'fulfilled') {
         const hmBuilds = hmRes.value.builds || {};
         Object.entries(hmBuilds).forEach(([id, b]) => {
-          merged[id] = { id, name: b.name || id, path: b.path || '', executable: b.executable || '' };
+          merged[id] = {
+            id,
+            name:          b.name || id,
+            path:          b.workingDirectory || b.path || '',
+            executable:    b.executablePath   ? b.executablePath.split('/').pop() : '',
+            hasExecutable: !!b.executablePath,
+          };
         });
       }
 
-      // From upload API (/api/builds/list) — use folder name as ID
+      // Upload API fills in anything HM hasn't scanned yet (e.g. just-uploaded build)
+      // Only add if it has a binary AND isn't already represented (case-insensitive)
       if (uploadRes.status === 'fulfilled') {
-        const uploaded = uploadRes.value.builds || [];
-        uploaded.forEach(b => {
-          const id = b.name;
+        (uploadRes.value.builds || []).forEach(b => {
+          if (!b.executable) return;              // skip builds without a binary
+          const id = normalizeId(b.name);         // use same normalisation as server
           if (!merged[id]) {
-            merged[id] = { id, name: b.name, path: b.path || '', executable: b.executable || '' };
+            merged[id] = {
+              id,
+              name:          b.name,
+              path:          b.path || '',
+              executable:    b.executable || '',
+              hasExecutable: true,
+            };
           }
         });
       }
 
-      const list = Object.values(merged);
+      // Only list builds that actually have a runnable binary
+      const list = Object.values(merged).filter(b => b.hasExecutable);
       setBuildList(list);
 
-      // Auto-select first build if nothing selected
-      setForm(f => ({ ...f, buildId: f.buildId || (list[0]?.id ?? '') }));
+      // Keep current selection if still valid, otherwise pick first
+      setForm(f => ({
+        ...f,
+        buildId: list.find(b => b.id === f.buildId) ? f.buildId : (list[0]?.id ?? ''),
+      }));
     } finally {
       setBuildsLoading(false);
     }
