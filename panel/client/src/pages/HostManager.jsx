@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Play, Square, RotateCcw, RefreshCw, Server, Package, Radio, ChevronDown, ChevronUp } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, AlertDialogMedia } from '../components/ui/alert-dialog.jsx';
+import { useAlert } from '../contexts/AlertContext.jsx';
 import { hm } from '../api/client.js';
 import { cn } from '../lib/utils.js';
 
@@ -40,6 +42,7 @@ function KVRow({ label, value }) {
 }
 
 export default function HostManager() {
+  const { warn, success: alertSuccess, alert: alertError } = useAlert();
   const [health,    setHealth]    = useState(null);
   const [regStatus, setRegStatus] = useState(null);
   const [regState,  setRegState]  = useState(null);
@@ -48,6 +51,7 @@ export default function HostManager() {
   const [busy,      setBusy]      = useState({});
   const [toast,     setToast]     = useState(null);
   const [showSvcs,  setShowSvcs]  = useState(true);
+  const [stopConfirm, setStopConfirm] = useState(false);
 
   const load = useCallback(async () => {
     const [h, rs, reg, b, sv] = await Promise.allSettled([
@@ -69,8 +73,9 @@ export default function HostManager() {
       if (action === 'stop')    await hm.stopRegistry();
       if (action === 'restart') await hm.restartRegistry();
       showToast(`Registry ${action}ed successfully`, 'success');
+      alertSuccess(`Registry ${action}ed successfully`);
       setTimeout(load, 800);
-    } catch (e) { showToast(e.message, 'error'); }
+    } catch (e) { showToast(e.message, 'error'); alertError(e.message); }
     finally { setBusy(b => ({ ...b, reg: null })); }
   }
 
@@ -161,7 +166,7 @@ export default function HostManager() {
               ) : (
                 <>
                   <ActionBtn onClick={() => doReg('restart')} loading={busy.reg === 'restart'} icon={RotateCcw} variant="default">Restart</ActionBtn>
-                  <ActionBtn onClick={() => doReg('stop')}    loading={busy.reg === 'stop'}    icon={Square}    variant="danger">Stop</ActionBtn>
+                  <ActionBtn onClick={() => setStopConfirm(true)} loading={busy.reg === 'stop'} icon={Square} variant="danger">Stop</ActionBtn>
                 </>
               )}
             </div>
@@ -268,6 +273,28 @@ export default function HostManager() {
           )}
         </AnimatePresence>
       </motion.div>
+
+      {/* Stop Registry Confirm Dialog */}
+      <AlertDialog open={stopConfirm} onOpenChange={setStopConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-red-500/10 border-red-500/20">
+              <Square className="w-6 h-6 text-red-400" />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Stop Registry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop the registry server. Active rooms will no longer be discoverable by clients until the registry is restarted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { setStopConfirm(false); doReg('stop'); }}>
+              Stop Registry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </motion.div>
   );
 }

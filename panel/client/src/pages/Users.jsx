@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users as UsersIcon, UserPlus, Trash2, Shield, RefreshCw, CheckCircle2, AlertCircle, Key } from 'lucide-react';
 import { auth } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { Avatar } from '../components/ui/avatar.jsx';
+import { Badge }  from '../components/ui/badge.jsx';
 import { cn } from '../lib/utils.js';
 
 const page = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0, transition: { duration: 0.25 } }, exit: { opacity: 0, y: -8, transition: { duration: 0.15 } } };
@@ -208,13 +210,11 @@ export default function Users() {
               className="flex items-center justify-between gap-4 px-5 py-3.5"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/15 flex items-center justify-center text-xs font-bold text-blue-400 flex-shrink-0">
-                  {u.username[0].toUpperCase()}
-                </div>
+                <Avatar fallback={u.username[0]} badge={true} size="sm" />
                 <div>
                   <div className="text-sm font-medium text-white flex items-center gap-2">
                     {u.username}
-                    {u.username === me?.username && <span className="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded-full">You</span>}
+                    {u.username === me?.username && <Badge variant="outline">You</Badge>}
                   </div>
                   <div className="text-[11px] text-slate-600">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}</div>
                 </div>

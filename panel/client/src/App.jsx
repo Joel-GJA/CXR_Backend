@@ -1,8 +1,9 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { useAuth } from './contexts/AuthContext.jsx';
-import Layout      from './components/Layout.jsx';
+import { useAuth }    from './contexts/AuthContext.jsx';
+import Layout         from './components/Layout.jsx';
+import AlertSystem    from './components/AlertSystem.jsx';
 import Login       from './pages/Login.jsx';
 import Overview    from './pages/Overview.jsx';
 import HostManager from './pages/HostManager.jsx';
@@ -37,15 +38,20 @@ export default function App() {
   );
 
   if (!user) return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/login" element={<Login />} />
-        <Route path="*"      element={<Navigate to="/login" replace />} />
-      </Routes>
-    </AnimatePresence>
+    <>
+      <AlertSystem />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login" element={<Login />} />
+          <Route path="*"      element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AnimatePresence>
+    </>
   );
 
   return (
+    <>
+    <AlertSystem />
     <Layout>
       <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
@@ -64,5 +70,6 @@ export default function App() {
         </Routes>
       </AnimatePresence>
     </Layout>
+    </>
   );
 }

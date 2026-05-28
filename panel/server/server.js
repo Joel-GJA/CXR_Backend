@@ -229,7 +229,7 @@ app.post('/api/registry/auto-clean', authMiddleware, async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     ok:              true,
-    service:         'cxr-nareen-panel',
+    service:         'cxr-backend-panel',
     panelPort:       config.port,
     roomCount:       roomManager.listRooms().length,
     serviceCount:    processManager.list().length,

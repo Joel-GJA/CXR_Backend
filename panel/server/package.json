@@ -1,5 +1,5 @@
 {
-  "name": "nareen-panel-server",
+  "name": "cxr-backend-panel-server",
   "version": "1.0.0",
   "private": true,
   "description": "Nareen Phase 3 — All-in-one Ops Panel + Host Manager backend",

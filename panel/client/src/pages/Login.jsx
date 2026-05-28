@@ -51,8 +51,8 @@ export default function Login() {
             <Zap className="w-7 h-7 text-white" />
           </motion.div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-white">CXR Ops Panel</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Phase 3 · Nareen</p>
+            <h1 className="text-xl font-bold text-white">CXR_Backend Panel</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Ops · Phase 3</p>
           </div>
         </div>
 

@@ -6,8 +6,10 @@ import {
   HeartPulse, Activity, UploadCloud, Users, LogOut,
   Sun, Moon, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext.jsx';
-import { useAuth }  from '../contexts/AuthContext.jsx';
+import { useTheme }  from '../contexts/ThemeContext.jsx';
+import { useAuth }   from '../contexts/AuthContext.jsx';
+import { Avatar }    from './ui/avatar.jsx';
+import { Badge }     from './ui/badge.jsx';
 import { cn } from '../lib/utils.js';
 
 const ROLE_COLORS = {
@@ -88,8 +90,8 @@ export default function Layout({ children }) {
                 initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.18 }} className="overflow-hidden whitespace-nowrap"
               >
-                <div className="text-sm font-bold text-white leading-tight">CXR Ops Panel</div>
-                <div className="text-[11px] text-blue-400/60 leading-tight mt-0.5">Phase 3 · Nareen</div>
+                <div className="text-sm font-bold text-white leading-tight">CXR_Backend Panel</div>
+                <div className="text-[11px] text-blue-400/60 leading-tight mt-0.5">Ops · Phase 3</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -104,7 +106,7 @@ export default function Layout({ children }) {
             >
               <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full px-3 py-1 w-fit">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping-slow" />
-                <span className="text-[10px] font-bold text-blue-400 tracking-wider uppercase">Phase 3 Active</span>
+                <span className="text-[10px] font-bold text-blue-400 tracking-wider uppercase">Phase 3 · Live</span>
               </div>
             </motion.div>
           )}
@@ -174,14 +176,12 @@ export default function Layout({ children }) {
                 <>
                   {/* User info row */}
                   <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-700/20 border border-blue-500/25 flex items-center justify-center text-sm font-bold text-blue-300 flex-shrink-0">
-                      {user.username[0].toUpperCase()}
-                    </div>
+                    <Avatar fallback={user.username[0]} badge={true} size="default" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-semibold text-white truncate leading-tight">{user.username}</div>
-                      <span className={cn('text-[9px] font-bold uppercase tracking-widest border rounded-full px-1.5 py-0.5', ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
+                      <Badge variant={user.role === 'admin' ? 'default' : user.role === 'operator' ? 'success' : 'warning'} className="mt-0.5">
                         {user.role}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                   {/* Logout button — full width, clearly red */}
@@ -197,8 +197,8 @@ export default function Layout({ children }) {
                 <motion.button
                   whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.93 }}
                   onClick={logout}
-                  title="Sign out"
-                  className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-all"
+                  title={`Sign out (${user.username})`}
+                  className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-all"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </motion.button>
