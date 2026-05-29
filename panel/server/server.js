@@ -2,6 +2,7 @@ const express      = require('express');
 const http         = require('http');
 const path         = require('path');
 const fs           = require('fs');
+const os           = require('os');
 const cors         = require('cors');
 const cookieParser = require('cookie-parser');
 const config       = require('./config');
@@ -52,7 +53,7 @@ app.use(express.json({ limit: '2mb' }));
 // Browser navigations send Sec-Fetch-Dest: document; API fetches don't.
 const clientDist = path.join(__dirname, '../client/dist');
 const PANEL_UI_PATHS = new Set([
-  '/overview', '/hostmanager', '/rooms', '/services',
+  '/overview', '/hostmanager', '/rooms', '/services', '/server',
   '/logs', '/health', '/events', '/builds', '/users', '/login',
 ]);
 app.use((req, res, next) => {
@@ -120,6 +121,18 @@ app.post('/rooms/:id/stop', authMiddleware, (req, res) => {
 app.post('/rooms/:id/restart', authMiddleware, (req, res) => {
   try { res.json(roomManager.restartRoom(req.params.id)); setImmediate(pushState); }
   catch (err) { res.status(409).json({ error: err.message }); }
+});
+
+// Clear all stopped/failed rooms (must be registered BEFORE the :id delete route)
+app.post('/rooms/clear', authMiddleware, (req, res) => {
+  try { res.json(roomManager.clearStoppedRooms()); setImmediate(pushState); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Remove a single room entirely
+app.delete('/rooms/:id', authMiddleware, (req, res) => {
+  try { res.json(roomManager.removeRoom(req.params.id)); setImmediate(pushState); }
+  catch (err) { res.status(err.message.includes('not found') ? 404 : 409).json({ error: err.message }); }
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -304,6 +317,11 @@ app.get('/api/telemetry', authMiddleware, (req, res) => {
   });
 });
 
+// ── Live system stats (btop-style server status) ─────────────────────────────
+app.get('/api/system', authMiddleware, async (req, res) => {
+  res.json(await getSystemStats());
+});
+
 app.get('/builds', authMiddleware, (req, res) => {
   res.json({ builds: roomManager.listBuilds() });
 });
@@ -433,6 +451,76 @@ function buildStateSnapshot() {
 
 function pushState() {
   try { if (logWsServer) logWsServer.broadcastMessage(buildStateSnapshot()); } catch (_) {}
+}
+
+// ── System stats (CPU / memory / disk) for the Server Status page ────────────
+function cpuSnapshot() {
+  return os.cpus().map(c => {
+    const t = c.times;
+    return { total: t.user + t.nice + t.sys + t.idle + t.irq, idle: t.idle };
+  });
+}
+let _prevCpu = cpuSnapshot();
+
+function cpuUsage() {
+  const curr = cpuSnapshot();
+  const perCore = curr.map((c, i) => {
+    const prev = _prevCpu[i] || c;
+    const dTotal = c.total - prev.total;
+    const dIdle  = c.idle  - prev.idle;
+    return dTotal > 0 ? Math.max(0, Math.min(100, Math.round((1 - dIdle / dTotal) * 100))) : 0;
+  });
+  _prevCpu = curr;
+  const overall = perCore.length ? Math.round(perCore.reduce((a, b) => a + b, 0) / perCore.length) : 0;
+  return { overall, perCore };
+}
+
+async function diskUsage() {
+  const target = process.platform === 'win32' ? 'C:\\' : '/';
+  try {
+    const s = await fs.promises.statfs(target);
+    const total = s.blocks * s.bsize;
+    const free  = s.bavail * s.bsize;
+    const used  = total - (s.bfree * s.bsize);
+    return { total, used, free, usedPct: total > 0 ? Math.round((used / total) * 100) : 0, mount: target };
+  } catch (_) {
+    return null; // statfs unsupported on this platform/node
+  }
+}
+
+async function getSystemStats() {
+  const cpu      = cpuUsage();
+  const totalMem = os.totalmem();
+  const freeMem  = os.freemem();
+  const usedMem  = totalMem - freeMem;
+  const disk     = await diskUsage();
+  const cpus     = os.cpus();
+  return {
+    timestamp: new Date().toISOString(),
+    host: {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch:     os.arch(),
+      release:  os.release(),
+      uptime:   os.uptime(),
+    },
+    cpu: {
+      model:    (cpus[0]?.model || 'Unknown CPU').replace(/\s+/g, ' ').trim(),
+      cores:    cpus.length,
+      overall:  cpu.overall,
+      perCore:  cpu.perCore,
+      loadAvg:  os.loadavg().map(n => Math.round(n * 100) / 100),
+    },
+    memory: { total: totalMem, used: usedMem, free: freeMem, usedPct: Math.round((usedMem / totalMem) * 100) },
+    disk,
+    panel: {
+      rooms:       roomManager.listRooms().length,
+      services:    processManager.list().length,
+      uptime:      Math.floor(process.uptime()),
+      rss:         process.memoryUsage().rss,
+      registryUp:  !!(registryServiceId && processManager.list().find(s => s.serviceId === registryServiceId && s.status === 'running')),
+    },
+  };
 }
 
 async function fetchRegistryState() {

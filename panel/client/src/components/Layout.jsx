@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, Boxes, Server, Terminal,
   HeartPulse, Activity, UploadCloud, Users, LogOut,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Cpu,
 } from 'lucide-react';
 import { useTheme }    from '../contexts/ThemeContext.jsx';
 import { useAuth }     from '../contexts/AuthContext.jsx';
@@ -26,10 +26,11 @@ const NAV_GROUPS = [
   {
     label: 'Monitoring',
     items: [
-      { to: '/services', icon: Server,    label: 'Services'   },
-      { to: '/logs',     icon: Terminal,  label: 'Live Logs'  },
-      { to: '/health',   icon: HeartPulse, label: 'Health'    },
-      { to: '/events',   icon: Activity,  label: 'Events'     },
+      { to: '/services', icon: Server,    label: 'Services'      },
+      { to: '/server',   icon: Cpu,       label: 'Server Status' },
+      { to: '/logs',     icon: Terminal,  label: 'Live Logs'     },
+      { to: '/health',   icon: HeartPulse, label: 'Health'       },
+      { to: '/events',   icon: Activity,  label: 'Events'        },
     ],
   },
   {

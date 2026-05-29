@@ -118,6 +118,15 @@ class RoomManager {
 
   async createRoom(requestBody = {}) {
     const requestedName = normalizeRequestedName(requestBody.requestedName);
+
+    // Reject a new room if a live one (running/starting) already uses this name.
+    for (const existing of this.rooms.values()) {
+      if (existing.requestedName.toLowerCase() === requestedName.toLowerCase() &&
+          (existing.status === "running" || existing.status === "starting" || existing.status === "stopping")) {
+        throw new Error(`A room named "${requestedName}" is already running. Stop it first or choose a different name.`);
+      }
+    }
+
     const roomId = createRoomId();
     const port = await this.allocatePort();
     const metadata = normalizeMetadata(requestBody.metadata);
@@ -217,6 +226,33 @@ class RoomManager {
     this.recordActivity("room-stop-requested", { roomId, pid: room.pid, port: room.port });
     this.log("info", `Stopping room ${roomId}`);
     return this.serializeRoom(room);
+  }
+
+  // Remove a room entirely — kills its process if still running, clears the
+  // registry entry, and drops it from the room list.
+  removeRoom(roomId) {
+    const room = this.requireRoom(roomId);
+    try { this.processManager.remove(room.serviceId); } catch (_) {}
+    this.unpublishRoom(room);
+    this.serviceIdToRoomId.delete(room.serviceId);
+    this.rooms.delete(roomId);
+    this.recordActivity("room-removed", { roomId, port: room.port });
+    this.log("info", `Removed room ${roomId}`);
+    return { ok: true, roomId };
+  }
+
+  // Clear all rooms that are stopped or failed (leaves running rooms untouched).
+  clearStoppedRooms() {
+    const removed = [];
+    for (const [roomId, room] of this.rooms.entries()) {
+      let status = room.status;
+      try { status = this.processManager.getStatus(room.serviceId).status; } catch (_) {}
+      if (status === "stopped" || status === "failed") {
+        this.removeRoom(roomId);
+        removed.push(roomId);
+      }
+    }
+    return { ok: true, removed, count: removed.length };
   }
 
   restartRoom(roomId) {

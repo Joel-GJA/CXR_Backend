@@ -140,6 +140,20 @@ export default function Rooms() {
     finally { setBusy(b => ({ ...b, [id]: null })); }
   }
 
+  async function clearRoom(id) {
+    setBusy(b => ({ ...b, [id]: 'clear' }));
+    try { await hm.removeRoom(id); flash('Room cleared'); load(); }
+    catch (e) { flash(e.message, 'error'); }
+    finally { setBusy(b => ({ ...b, [id]: null })); }
+  }
+
+  async function clearAllRooms() {
+    setBusy(b => ({ ...b, clearAll: true }));
+    try { const r = await hm.clearRooms(); flash(r.count ? `Cleared ${r.count} stopped room(s)` : 'No stopped rooms to clear'); load(); }
+    catch (e) { flash(e.message, 'error'); }
+    finally { setBusy(b => ({ ...b, clearAll: false })); }
+  }
+
   async function loadRoomLogs(id) {
     try { const logs = await hm.roomLogs(id); setRoomLogs(p => ({ ...p, [id]: logs })); }
     catch (e) { flash(e.message, 'error'); }
@@ -308,6 +322,9 @@ export default function Rooms() {
         <div className="flex items-center gap-2 mb-4">
           <span className="text-sm font-semibold text-white">Running Rooms</span>
           <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-full">{rooms.length}</span>
+          {rooms.length > 0 && (
+            <Btn onClick={clearAllRooms} loading={busy.clearAll} icon={Trash2} sm variant="danger">Clear All Stopped</Btn>
+          )}
         </div>
         {rooms.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -369,6 +386,7 @@ export default function Rooms() {
                     >
                       {roomLogs[room.roomId] ? 'Hide' : 'Logs'}
                     </Btn>
+                    <Btn onClick={() => clearRoom(room.roomId)} loading={busy[room.roomId] === 'clear'} icon={Trash2} sm variant="danger">Clear</Btn>
                   </div>
                   <AnimatePresence>
                     {roomLogs[room.roomId] && (

@@ -33,12 +33,15 @@ export const hm = {
   state:           ()     => fetchJson('/api/state'),
   builds:          ()     => fetchJson('/builds'),
   telemetry:       ()     => fetchJson('/api/telemetry'),
+  system:          ()     => fetchJson('/api/system'),
   requestActivity: ()     => fetchJson('/api/request-activity'),
 
   listRooms:   ()         => fetchJson('/rooms'),
   createRoom:  (body)     => fetchJson('/rooms',                  { method: 'POST',   body: JSON.stringify(body) }),
   stopRoom:    (id)       => fetchJson(`/rooms/${id}/stop`,      { method: 'POST'   }),
   restartRoom: (id)       => fetchJson(`/rooms/${id}/restart`,   { method: 'POST'   }),
+  removeRoom:  (id)       => fetchJson(`/rooms/${id}`,           { method: 'DELETE' }),
+  clearRooms:  ()         => fetchJson('/rooms/clear',          { method: 'POST'   }),
   roomLogs:    (id)       => fetchJson(`/api/logs/rooms/${id}`),
 
   templates:      ()      => fetchJson('/templates'),

@@ -11,6 +11,7 @@ import Rooms       from './pages/Rooms.jsx';
 import Services    from './pages/Services.jsx';
 import Logs        from './pages/Logs.jsx';
 import Health      from './pages/Health.jsx';
+import ServerStatus from './pages/ServerStatus.jsx';
 import Events      from './pages/Events.jsx';
 import Builds      from './pages/Builds.jsx';
 import Users       from './pages/Users.jsx';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/services"    element={<ProtectedRoute><Services /></ProtectedRoute>} />
           <Route path="/logs"        element={<ProtectedRoute><Logs /></ProtectedRoute>} />
           <Route path="/health"      element={<ProtectedRoute><Health /></ProtectedRoute>} />
+          <Route path="/server"      element={<ProtectedRoute><ServerStatus /></ProtectedRoute>} />
           <Route path="/events"      element={<ProtectedRoute><Events /></ProtectedRoute>} />
           <Route path="/builds"      element={<ProtectedRoute><Builds /></ProtectedRoute>} />
           <Route path="/users"       element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
