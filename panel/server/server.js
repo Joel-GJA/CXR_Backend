@@ -283,6 +283,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── Prometheus metrics (public, no cookie — scrapers can't auth via cookie) ───
+// Single scrape target aggregating panel rooms/services/events/system state.
+app.get('/metrics', async (req, res) => {
+  try {
+    const body = await buildPrometheusMetrics();
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(body);
+  } catch (err) {
+    res.status(500).set('Content-Type', 'text/plain').send(`# metrics error: ${err.message}\n`);
+  }
+});
+
 app.get('/api/state', authMiddleware, (req, res) => {
   const rooms    = roomManager.listRooms();
   const running  = rooms.filter(r => r.status === 'running' || r.status === 'starting');
@@ -521,6 +533,97 @@ async function getSystemStats() {
       registryUp:  !!(registryServiceId && processManager.list().find(s => s.serviceId === registryServiceId && s.status === 'running')),
     },
   };
+}
+
+// ── Prometheus exposition builder ─────────────────────────────────────────────
+// Escapes a Prometheus label value (backslash, double-quote, newline).
+function promLabel(v) {
+  return String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
+}
+
+async function buildPrometheusMetrics() {
+  const L = [];
+  const line = (s) => L.push(s);
+  const metric = (name, help, type, value, labels = '') => {
+    line(`# HELP ${name} ${help}`);
+    line(`# TYPE ${name} ${type}`);
+    line(`${name}${labels} ${value}`);
+  };
+
+  const rooms    = roomManager.listRooms();
+  const services = processManager.list();
+  const running  = rooms.filter(r => r.status === 'running' || r.status === 'starting');
+  const svcRun   = services.filter(s => s.status === 'running' || s.status === 'starting');
+  const registryUp = !!(registryServiceId && services.find(s => s.serviceId === registryServiceId && s.status === 'running'));
+
+  metric('cxr_panel_up', 'Panel server is up.', 'gauge', 1);
+  metric('cxr_panel_uptime_seconds', 'Panel process uptime in seconds.', 'gauge', Math.floor(process.uptime()));
+  metric('cxr_registry_up', 'Room registry running (1) or not (0).', 'gauge', registryUp ? 1 : 0);
+
+  metric('cxr_rooms_total', 'Total rooms tracked by the host manager.', 'gauge', rooms.length);
+  metric('cxr_rooms_running', 'Rooms currently running or starting.', 'gauge', running.length);
+  metric('cxr_services_total', 'Total managed services.', 'gauge', services.length);
+  metric('cxr_services_running', 'Services currently running or starting.', 'gauge', svcRun.length);
+
+  // Per-room player gauges
+  if (rooms.length) {
+    line('# HELP cxr_room_players Current players in a room.');
+    line('# TYPE cxr_room_players gauge');
+    for (const r of rooms) {
+      const lbl = `{room_id="${promLabel(r.roomId)}",room_name="${promLabel(r.requestedName)}",status="${promLabel(r.status)}"}`;
+      line(`cxr_room_players${lbl} ${r.playerCount ?? 0}`);
+    }
+    line('# HELP cxr_room_max_players Maximum players allowed in a room.');
+    line('# TYPE cxr_room_max_players gauge');
+    for (const r of rooms) {
+      const lbl = `{room_id="${promLabel(r.roomId)}",room_name="${promLabel(r.requestedName)}"}`;
+      line(`cxr_room_max_players${lbl} ${r.maxParticipants ?? 0}`);
+    }
+  }
+
+  // Per-service CPU / memory (from process manager metrics)
+  if (services.length) {
+    line('# HELP cxr_service_cpu_percent Per-service CPU usage percent.');
+    line('# TYPE cxr_service_cpu_percent gauge');
+    for (const s of services) {
+      const lbl = `{service_id="${promLabel(s.serviceId)}",label="${promLabel(s.label || s.templateName)}"}`;
+      line(`cxr_service_cpu_percent${lbl} ${s.cpu ?? 0}`);
+    }
+    line('# HELP cxr_service_memory_mb Per-service memory (MB).');
+    line('# TYPE cxr_service_memory_mb gauge');
+    for (const s of services) {
+      const lbl = `{service_id="${promLabel(s.serviceId)}",label="${promLabel(s.label || s.templateName)}"}`;
+      line(`cxr_service_memory_mb${lbl} ${s.memory ?? 0}`);
+    }
+  }
+
+  // System resources
+  try {
+    const sys = await getSystemStats();
+    metric('cxr_cpu_usage_percent', 'Overall CPU usage percent.', 'gauge', sys.cpu.overall);
+    metric('cxr_load1', 'System load average (1m).', 'gauge', sys.cpu.loadAvg[0] ?? 0);
+    metric('cxr_memory_used_bytes', 'Used system memory in bytes.', 'gauge', sys.memory.used);
+    metric('cxr_memory_total_bytes', 'Total system memory in bytes.', 'gauge', sys.memory.total);
+    if (sys.disk) {
+      metric('cxr_disk_used_bytes', 'Used disk in bytes.', 'gauge', sys.disk.used);
+      metric('cxr_disk_total_bytes', 'Total disk in bytes.', 'gauge', sys.disk.total);
+    }
+  } catch (_) {}
+
+  // Event persistence stats
+  try {
+    const st = await writer.stats();
+    metric('cxr_events_total', 'Total persisted runtime events.', 'counter', st.total || 0);
+    if (Array.isArray(st.byType) && st.byType.length) {
+      line('# HELP cxr_event_type_total Persisted events grouped by type.');
+      line('# TYPE cxr_event_type_total counter');
+      for (const row of st.byType) {
+        line(`cxr_event_type_total{event_type="${promLabel(row.event_type)}"} ${row.count || 0}`);
+      }
+    }
+  } catch (_) {}
+
+  return L.join('\n') + '\n';
 }
 
 async function fetchRegistryState() {

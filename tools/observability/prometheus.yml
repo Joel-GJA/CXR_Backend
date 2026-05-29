@@ -1,0 +1,28 @@
+# Prometheus scrape config for the CXR Backend Panel.
+#
+# The panel exposes a single aggregated metrics endpoint at /metrics
+# (rooms, players, services, CPU/memory/disk, persisted event counts).
+#
+# Run:  prometheus --config.file=prometheus.yml
+# Then open http://localhost:9090 and query e.g. cxr_rooms_running
+
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: cxr-panel
+    metrics_path: /metrics
+    static_configs:
+      # Change to the panel host:port (default 4000). Use the LAN IP for a
+      # remote Prometheus, e.g. ['192.168.1.20:4000'].
+      - targets: ['localhost:4000']
+        labels:
+          service: cxr-backend-panel
+          env: lan
+
+  # Optional: scrape the room registry health if you expose it separately.
+  # - job_name: cxr-registry
+  #   metrics_path: /health
+  #   static_configs:
+  #     - targets: ['localhost:8080']
