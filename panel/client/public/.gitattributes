@@ -1,0 +1,8 @@
+# Panel web assets must be stored as normal Git blobs, NOT Git LFS.
+# The repo root marks *.png as LFS (for Unity art); that breaks these logos
+# on servers without `git lfs pull`, since only pointer files get checked out
+# and Vite copies those pointers into dist/. Override it here so the panel
+# logos render everywhere with zero LFS dependency.
+*.png -filter -diff -merge -text
+*.svg -filter -diff -merge -text
+*.ico -filter -diff -merge -text
