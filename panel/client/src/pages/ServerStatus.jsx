@@ -143,9 +143,6 @@ export default function ServerStatus() {
 
         {/* body */}
         <div className="bg-[#020810] p-4 space-y-3 relative">
-          {/* scanline */}
-          <div className="pointer-events-none absolute inset-0 opacity-[0.03] [background:repeating-linear-gradient(0deg,#fff_0,#fff_1px,transparent_1px,transparent_3px)]" />
-
           {err && !sys ? (
             <div className="text-red-400 font-mono text-sm py-8 text-center">✗ {err}</div>
           ) : !sys ? (

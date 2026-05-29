@@ -69,9 +69,6 @@ export default function Terminal({
             HEIGHTS[height] || HEIGHTS.md,
           )}
         >
-          {/* Subtle CRT scanline overlay */}
-          <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background:repeating-linear-gradient(0deg,#fff_0,#fff_1px,transparent_1px,transparent_3px)]" />
-
           {lines.length === 0 ? (
             <div className="flex items-center gap-2 text-slate-600">
               <span className="text-cyan-500/80">$</span>
