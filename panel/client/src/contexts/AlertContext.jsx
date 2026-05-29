@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 
 const AlertContext = createContext(null);
 
+// ── Alert sound volume ──────────────────────────────────────────────────────
+// Master multiplier for all alert beeps. 1 = current level, 2 = twice as loud,
+// 3 = 3×, etc. Keep the *resulting* gain at or below ~1.0 to avoid distortion.
+// Change this one number to make every alert louder or quieter.
+const MASTER_VOLUME = 2.2;
+
 // Generates a short beep using Web Audio API — no external file needed
 function playSound(type) {
   try {
@@ -11,28 +17,31 @@ function playSound(type) {
     osc.connect(gain);
     gain.connect(ctx.destination);
 
+    // Clamp so MASTER_VOLUME can't push gain past 1.0 (which clips/distorts)
+    const vol = (base) => Math.min(base * MASTER_VOLUME, 1);
+
     if (type === 'error') {
       osc.frequency.setValueAtTime(220, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.4);
-      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.setValueAtTime(vol(0.4), ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
       osc.start(); osc.stop(ctx.currentTime + 0.5);
     } else if (type === 'warning') {
       osc.frequency.setValueAtTime(440, ctx.currentTime);
       osc.frequency.setValueAtTime(360, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.setValueAtTime(vol(0.3), ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
       osc.start(); osc.stop(ctx.currentTime + 0.35);
     } else if (type === 'success') {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(520, ctx.currentTime);
       osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.setValueAtTime(vol(0.25), ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
       osc.start(); osc.stop(ctx.currentTime + 0.3);
     } else {
       osc.frequency.setValueAtTime(600, ctx.currentTime);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.setValueAtTime(vol(0.15), ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
       osc.start(); osc.stop(ctx.currentTime + 0.2);
     }
