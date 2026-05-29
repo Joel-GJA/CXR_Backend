@@ -52,6 +52,9 @@ class RoomManager {
         if (status.status === "stopped" || status.status === "failed") {
           room.stoppedAtUtc = new Date().toISOString();
           room.pid = null;
+          // Instantly clear the room from the registry so it disappears from
+          // clients/panel the moment the process exits (don't wait for stale TTL).
+          this.unpublishRoom(room);
           if (status.error) {
             this.writeRoomLog(
               path.join(this.config.logsDirectory, `${roomId}.stderr.log`),
@@ -209,6 +212,8 @@ class RoomManager {
     const result = this.processManager.stop(room.serviceId);
     room.status = "stopping";
     room.stoppedAtUtc = new Date().toISOString();
+    // Remove from registry immediately on user request — don't wait for process exit.
+    this.unpublishRoom(room);
     this.recordActivity("room-stop-requested", { roomId, pid: room.pid, port: room.port });
     this.log("info", `Stopping room ${roomId}`);
     return this.serializeRoom(room);

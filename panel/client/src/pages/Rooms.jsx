@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Boxes, Plus, RotateCcw, Square, FileText, Users, Wifi, WifiOff, Package, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Boxes, Plus, RotateCcw, Square, FileText, Users, Wifi, WifiOff, Package, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogTerminal from '../components/LogTerminal.jsx';
 import { hm, buildsApi } from '../api/client.js';
@@ -143,6 +143,16 @@ export default function Rooms() {
   async function loadRoomLogs(id) {
     try { const logs = await hm.roomLogs(id); setRoomLogs(p => ({ ...p, [id]: logs })); }
     catch (e) { flash(e.message, 'error'); }
+  }
+
+  async function removeRegistryRoom(roomId) {
+    setBusy(b => ({ ...b, [`reg-${roomId}`]: true }));
+    try {
+      await hm.deleteRegistryRoom(roomId);
+      flash('Removed from registry');
+      load();
+    } catch (e) { flash(e.message, 'error'); }
+    finally { setBusy(b => ({ ...b, [`reg-${roomId}`]: false })); }
   }
 
   function flash(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); }
@@ -400,7 +410,7 @@ export default function Rooms() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left border-b border-white/[0.06]">
-                      {['Name', 'IP:Port', 'Players', 'Status'].map(h => (
+                      {['Name', 'IP:Port', 'Players', 'Status', ''].map(h => (
                         <th key={h} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-3 pr-4">{h}</th>
                       ))}
                     </tr>
@@ -411,7 +421,18 @@ export default function Rooms() {
                         <td className="py-3 pr-4 text-white font-medium">{r.roomName}</td>
                         <td className="py-3 pr-4 font-mono text-xs text-slate-400">{r.ipAddress}:{r.port}</td>
                         <td className="py-3 pr-4 text-slate-400">{r.playerCount}/{r.maxPlayers}</td>
-                        <td className="py-3"><StatusBadge status={r.status} /></td>
+                        <td className="py-3 pr-4"><StatusBadge status={r.status} /></td>
+                        <td className="py-3 text-right">
+                          <motion.button
+                            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                            onClick={() => removeRegistryRoom(r.roomId)}
+                            disabled={busy[`reg-${r.roomId}`]}
+                            title="Remove from registry"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </motion.button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

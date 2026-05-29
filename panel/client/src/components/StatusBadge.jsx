@@ -4,6 +4,8 @@ import { cn } from '../lib/utils.js';
 const VARIANTS = {
   running:  { dot: 'bg-emerald-400 animate-ping-slow shadow-glow-green', ring: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
   ok:       { dot: 'bg-emerald-400 animate-ping-slow shadow-glow-green', ring: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  active:   { dot: 'bg-emerald-400 animate-ping-slow shadow-glow-green', ring: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  online:   { dot: 'bg-emerald-400 animate-ping-slow shadow-glow-green', ring: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
   open:     { dot: 'bg-emerald-400', ring: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
   starting: { dot: 'bg-yellow-400 animate-ping-slow',  ring: 'bg-yellow-400', text: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/25' },
   pending:  { dot: 'bg-yellow-400 animate-ping-slow',  ring: 'bg-yellow-400', text: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/25' },

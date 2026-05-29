@@ -193,7 +193,9 @@ app.post('/api/registry/start', authMiddleware, async (req, res) => {
       cwd:          path.dirname(config.registryScript),
       env:          {
         CXR_REGISTRY_PORT:    String(config.registryPort),
-        CXR_REGISTRY_STALE_MS: '0',
+        // Auto-expire rooms that stop heartbeating (e.g. crashed/killed/editor sessions).
+        // Rooms re-publish frequently, so 20s removes dead entries without dropping live ones.
+        CXR_REGISTRY_STALE_MS: '20000',
         CXR_ADMIN_TOKEN:      config.adminToken,
       },
       needsPort:    false,
